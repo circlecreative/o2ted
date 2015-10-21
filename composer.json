@@ -37,6 +37,8 @@
 	"require": {
 		"php": ">=5.4.0",
 		"o2system/o2glob":"dev-master",
+		"o2system/o2parser":"dev-master",
+		"o2system/o2cache":"dev-master",
 		"matthiasmullie/minify":"*"
 	},
 	"autoload": {
