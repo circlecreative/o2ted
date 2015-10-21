@@ -36,7 +36,9 @@
 		"github-wiki": "http://github.com/circlecreative/o2template/wiki"
 	},
 	"require": {
-		"php": ">=5.4.0"
+		"php": ">=5.4.0",
+		"o2glob":"dev-master",
+		"matthiasmullie/minify":"*"
 	},
 	"autoload": {
 		"psr-4": {
