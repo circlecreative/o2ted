@@ -1,8 +1,7 @@
 {
 	"name": "o2system/o2template",
-	"description": "",
+	"description": "PHP Template Theme Management",
 	"license": "MIT",
-	"version": "1.0.0-beta",
 	"type": "php-libraries",
 	"keywords": ["utilities","php","framework","driver","libraries"],
 	"authors": [
@@ -36,10 +35,10 @@
 	},
 	"require": {
 		"php": ">=5.4.0",
-		"o2system/o2glob":"dev-master",
-		"o2system/o2parser":"dev-master",
-		"o2system/o2cache":"dev-master",
-        "o2system/o2bootstrap":"dev-master",
+		"o2system/o2glob":"*",
+		"o2system/o2parser":"*",
+		"o2system/o2cache":"*",
+        "o2system/o2bootstrap":"*",
 		"matthiasmullie/minify":"*"
 	},
 	"autoload": {

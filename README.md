@@ -1,5 +1,5 @@
-# O2TED
-O2TED is a Template Engine Driver to standardize many template engine by [PT. Lingkar Kreasi (Circle Creative)][1].
+# O2Template
+O2Template is a Template Theme Management by [PT. Lingkar Kreasi (Circle Creative)][1].
 
 Features
 ------------------
