@@ -37,164 +37,230 @@
  */
 // ------------------------------------------------------------------------
 
-namespace O2System;
-
-use O2System\Glob\Interfaces\Libraries;
-use O2System\Glob\Exception;
-
-class Template extends Libraries
+namespace O2System
 {
-    /**
-     * Template Parser Resource
-     *
-     * @access  public
-     * @type    Parser
-     */
-    public $parser;
 
-    /**
-     * Template Class Constructor
-     *
-     * @param Parser $parser
-     * @param Cache  $cache
-     *
-     * @access  public
-     */
-    public function __construct( $config = array() )
-    {
-        // Define Template Glob Exception
-        $exception = new Exception();
-        $exception->register_path( __DIR__ . '/Views/' );
-        $exception->register_handler();
+	use O2System\Glob\Interfaces\Libraries;
 
-        parent::__construct( $config );
+	/**
+	 * Class Template
+	 *
+	 * @package     O2Template
+	 * @author      O2System Developer Team
+	 * @link        http://o2system.in/features/o2template
+	 */
+	class Template extends Libraries
+	{
+		/**
+		 * Template Parser Resource
+		 *
+		 * @access  public
+		 * @type    Parser
+		 */
+		public $parser;
 
-        if( isset( $this->_config[ 'parser' ] ) )
-        {
-            $this->parser = new Parser( $this->_config[ 'parser' ] );
-        }
-        else
-        {
-            $this->parser = new Parser();
-        }
-    }
+		// ------------------------------------------------------------------------
 
-    public function render( $view, array $vars = array(), $return = FALSE )
-    {
-        // Load Template Theme
-        $template_vars[ 'theme' ] = $this->theme->active;
+		/**
+		 * Class Constructor
+		 *
+		 * @param array $config
+		 *
+		 * @access  public
+		 */
+		public function __construct( $config = array() )
+		{
+			parent::__construct( $config );
 
-        // Load Template Metadata
-        if( isset( $this->theme->active->settings[ 'metadata' ] ) )
-        {
-            $this->metadata->parse_settings( $this->theme->active->settings[ 'metadata' ] );
-        }
-        $template_vars[ 'metadata' ] = $this->metadata->render();
+			if ( isset( $this->_config[ 'parser' ] ) )
+			{
+				$this->parser = new Parser( $this->_config[ 'parser' ] );
+			}
+			else
+			{
+				$this->parser = new Parser();
+			}
+		}
 
-        // Load Template Assets
-        $this->assets->add_paths( $this->theme->active->realpath );
+		// ------------------------------------------------------------------------
 
-        if( isset( $this->theme->active->settings[ 'assets' ] ) )
-        {
-            $this->assets->parse_settings( $this->theme->active->settings[ 'assets' ] );
-        }
+		/**
+		 * Render
+		 *
+		 * Render template output
+		 *
+		 * @param            $view
+		 * @param array      $vars
+		 * @param bool|FALSE $return
+		 *
+		 * @return string
+		 */
+		public function render( $view, array $vars = array(), $assets = array() )
+		{
+			if ( ! isset( $this->theme->active ) )
+			{
+				$active = $this->theme->default;
+			}
+			else
+			{
+				$active = $this->theme->active;
+			}
 
-        // Load Template Navigations
-        $template_vars[ 'navigations' ] = $this->navigation->render();
+			if ( empty( $active ) )
+			{
+				throw new \RuntimeException( 'Template theme not set' );
+			}
 
-        // Load Template Breadcrumb
-        $template_vars[ 'breadcrumb' ] = $this->breadcrumb->render();
+			// Load Template Theme
+			$template_vars[ 'theme' ] = $active;
 
-        // Merge Vars Data
-        $template_vars = array_merge( $template_vars, $vars );
+			// Load Template Metadata
+			if ( isset( $active->settings[ 'metadata' ] ) )
+			{
+				$this->metadata->parse_settings( $active->settings[ 'metadata' ] );
+			}
 
-        $partials = $this->theme->active->partials;
+			$template_vars[ 'metadata' ] = $this->metadata->render();
 
-        if( strpos( $view, 'views' ) )
-        {
-            if( file_exists( $view ) )
-            {
-                $partials[ 'content' ] = $view;
-            }
+			// Load Template Assets
+			$this->assets->add_paths( $active->realpath );
 
-            $x_view = explode( 'views/', $view );
+			if ( isset( $active->settings[ 'assets' ] ) )
+			{
+				$this->assets->parse_settings( $active->settings[ 'assets' ] );
+			}
 
-            if( file_exists( $this->theme->active->realpath . 'views/' . end( $x_view ) ) )
-            {
-                $partials[ 'content' ] = $this->theme->active->realpath . 'views/' . end( $x_view );
-            }
-        }
-        elseif( file_exists( $view ) )
-        {
-            $partials[ 'content' ] = $view;
-        }
+			// Load view assets
+			if ( ! empty( $assets ) )
+			{
+				foreach ( $assets as $extension => $files )
+				{
+					foreach ( $files as $asset )
+					{
+						$this->assets->{'link_' . $extension}( $this->assets->path_to_url( $asset ) );
+					}
+				}
+			}
 
-        if( ! isset( $partials[ 'content' ] ) )
-        {
-            throw new \RuntimeException( 'Unable to load the requested view file: ' . $view );
-        }
+			// Merge Vars Data
+			$template_vars = array_merge_recursive( $template_vars, $vars );
 
-        $template_vars[ 'partials' ] = new \stdClass();
+			if ( ! isset( $template_vars[ 'partials' ] ) )
+			{
+				$template_vars[ 'partials' ] = new \stdClass();
+			}
+			elseif ( ! is_object( $template_vars[ 'partials' ] ) )
+			{
+				$template_vars[ 'partials' ] = (object) $template_vars[ 'partials' ];
+			}
 
-        foreach( $partials as $partial => $filepath )
-        {
-            if( file_exists( $filepath ) )
-            {
-                $partial_content = $this->parser->parse_source_code(  file_get_contents( $filepath ), $template_vars );
+			$partials = empty( $active->partials ) ? array() : $active->partials;
 
-                $DOM = new \DOMDocument();
-                @$DOM->loadHTML($partial_content);
-                $DOM->preserveWhiteSpace = FALSE;
+			if ( strpos( $view, 'views' ) )
+			{
+				if ( file_exists( $view ) )
+				{
+					$partials[ 'content' ] = $view;
+				}
 
-                $inline_js = $DOM->getElementsByTagName('script');
-                $inline_style = $DOM->getElementsByTagName('style');
+				$x_view = explode( 'views' . DIRECTORY_SEPARATOR, $view );
 
-                // Fetch Inline JS
-                if(! empty($inline_js))
-                {
-                    foreach($inline_js as $item)
-                    {
-                        $this->assets->inline_js($item->nodeValue);
-                    }
+				if ( file_exists( $active->realpath . 'views' . DIRECTORY_SEPARATOR . end( $x_view ) ) )
+				{
+					$partials[ 'content' ] = $active->realpath . 'views' . DIRECTORY_SEPARATOR . end( $x_view );
+				}
+			}
+			elseif ( file_exists( $view ) )
+			{
+				$partials[ 'content' ] = $view;
+			}
 
-                    $partial_content = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $partial_content);
-                }
+			if ( ! isset( $partials[ 'content' ] ) )
+			{
+				throw new \RuntimeException( 'Unable to load the requested view file: ' . $view );
+			}
 
-                // Fetch Inline Style
-                if(! empty($inline_style))
-                {
-                    foreach($inline_style as $item)
-                    {
-                        $this->assets->inline_css($item->nodeValue);
-                    }
+			foreach ( $partials as $partial => $filepath )
+			{
+				if ( file_exists( $filepath ) )
+				{
+					$partial_content = $this->parser->parse_source_code( file_get_contents( $filepath ), $template_vars );
 
-                    $partial_content = preg_replace('#<style(.*?)>(.*?)</style>#is', '', $partial_content);
-                }
+					$DOM = new \DOMDocument();
+					@$DOM->loadHTML( $partial_content );
+					$DOM->preserveWhiteSpace = FALSE;
 
-                $template_vars[ 'partials' ]->{$partial} = $partial_content;
-            }
-        }
+					$inline_js = $DOM->getElementsByTagName( 'script' );
+					$inline_style = $DOM->getElementsByTagName( 'style' );
 
-        $template_vars[ 'assets' ] = $this->assets->render();
+					// Fetch Inline JS
+					if ( ! empty( $inline_js ) )
+					{
+						foreach ( $inline_js as $item )
+						{
+							$this->assets->inline_js( $item->nodeValue );
+						}
 
-        if( file_exists( $this->theme->active->layout ) )
-        {
-            $output = $this->parser->parse_source_code( file_get_contents( $this->theme->active->layout ), $template_vars );
+						$partial_content = preg_replace( '#<script(.*?)>(.*?)</script>#is', '', $partial_content );
+					}
 
-            if( $return === TRUE )
-            {
-                return $output;
-            }
-            else
-            {
-                $this->output->set_content_type( 'text/html' );
-                $this->output->set_output( $output );
-            }
-        }
-        else
-        {
-            $layout = empty( $this->theme->active->layout ) ? 'theme.tpl' : $this->theme->active->layout;
-            throw new \RuntimeException( 'Unable to load the requested template file: ' . $layout );
-        }
-    }
+					// Fetch Inline Style
+					if ( ! empty( $inline_style ) )
+					{
+						foreach ( $inline_style as $item )
+						{
+							$this->assets->inline_css( $item->nodeValue );
+						}
+
+						$partial_content = preg_replace( '#<style(.*?)>(.*?)</style>#is', '', $partial_content );
+					}
+
+					$template_vars[ 'partials' ]->{$partial} = $partial_content;
+				}
+			}
+
+			$template_vars[ 'assets' ] = $this->assets->render();
+
+			if ( file_exists( $active->layout ) )
+			{
+				$output = $this->parser->parse_source_code( file_get_contents( $active->layout ), $template_vars );
+
+				$this->output->set_content_type( 'text/html' );
+				$this->output->set_content( $output );
+			}
+			else
+			{
+				$layout = empty( $active->layout ) ? 'theme.tpl' : $active->layout;
+				throw new \RuntimeException( 'Unable to load the requested template file: ' . $layout );
+			}
+		}
+	}
 }
+
+// ------------------------------------------------------------------------
+
+namespace O2System\Template
+{
+
+	use O2System\Glob\Exception\Interfaces as ExceptionInterface;
+
+	/**
+	 * Class Exception
+	 *
+	 * @package     O2Template
+	 *
+	 * @author      O2System Developer Team
+	 * @link        http://o2system.in/features/o2template
+	 */
+	class Exception extends ExceptionInterface
+	{
+		public function __construct( $message = NULL, $code = 0, $previous = NULL )
+		{
+			parent::__construct( $message, $code, $previous );
+
+			// Register Custom Exception View Path
+			$this->register_view_paths( __DIR__ . '/Views/' );
+		}
+	}
+}
+

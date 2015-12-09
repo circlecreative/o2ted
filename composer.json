@@ -39,6 +39,7 @@
 		"o2system/o2glob":"dev-master",
 		"o2system/o2parser":"dev-master",
 		"o2system/o2cache":"dev-master",
+        "o2system/o2bootstrap":"dev-master",
 		"matthiasmullie/minify":"*"
 	},
 	"autoload": {

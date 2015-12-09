@@ -184,14 +184,14 @@ class Output extends Drivers
     // --------------------------------------------------------------------
 
 
-    public function set_output( $content )
+    public function set_content( $content )
     {
         $this->_content = $content;
 
         return $this;
     }
 
-    public function append_output( $content )
+    public function append_content( $content )
     {
         $this->_content .= $content;
 
@@ -221,6 +221,20 @@ class Output extends Drivers
         }
         // --------------------------------------------------------------------
 
+		if( class_exists( 'O2System', FALSE ) )
+		{
+			$benchmark = \O2System::Benchmark();
+
+			if( ! empty($benchmark) )
+			{
+				$output = str_replace(
+					array( '{elapsed_time}', '{memory_usage}', '{memory_peak_usage}', '{cpu_usage}' ),
+					(array) $benchmark->elapsed(),
+					$output
+				);
+			}
+		}
+
         //remove optional ending tags (see http://www.w3.org/TR/html5/syntax.html#syntax-tag-omission )
         $remove = array(
             '</option>', '</li>', '</dt>', '</dd>', '</tr>', '</th>', '</td>'
@@ -247,6 +261,7 @@ class Output extends Drivers
 
         $output = mb_convert_encoding( $output, 'HTML-ENTITIES', 'UTF-8' );
         $output = preg_replace( array( '~\R~u', '~>[[:space:]]++<~m' ), array( "\n", '><' ), $output );
+
 
         if( ( empty( $output ) !== TRUE ) && ( @$doc->loadHTML( $output ) === TRUE ) )
         {
