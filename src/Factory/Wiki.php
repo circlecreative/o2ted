@@ -132,25 +132,26 @@ class Wiki
     }
 
     // ------------------------------------------------------------------------
+
     /**
-     * @return null|string
+     * @return string
      */
-    public function tocify()
+    public function tocify( $flavour = 'github' )
     {
         if( ! empty( $this->_files ) )
         {
             ksort( $this->_files, SORT_STRING );
 
+            $parser = new \O2System\Parser;
+
             foreach( $this->_files as $file )
             {
-                $output = file_get_contents( $file );
-                $markdown = new \Parsedown();
-                $contents[ ] = $markdown->text( $output );
+                $contents[ ] = $parser->parse_markdown( file_get_contents( $file ), $flavour );
             }
 
             return implode( PHP_EOL, $contents );
         }
 
-        return NULL;
+        return '';
     }
 }
