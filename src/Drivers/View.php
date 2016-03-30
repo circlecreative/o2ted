@@ -111,6 +111,7 @@ final class View extends DriverInterface
 			if ( pathinfo( $view_filepath, PATHINFO_EXTENSION ) === 'php' )
 			{
 				$output = $this->_library->parser->parse_php( file_get_contents( $view_filepath ), $vars );
+				$output = $this->_library->parser->parse_string( $output, $vars );
 			}
 			else
 			{
