@@ -6,7 +6,7 @@
  *
  * This content is released under the MIT License (MIT)
  *
- * Copyright (c) 2015, PT. Lingkar Kreasi (Circle Creative).
+ * Copyright (c) 2015, .
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
  *
  * @package        O2System
  * @author         Circle Creative Dev Team
- * @copyright      Copyright (c) 2005 - 2015, PT. Lingkar Kreasi (Circle Creative).
+ * @copyright      Copyright (c) 2005 - 2015, .
  * @license        http://circle-creative.com/products/o2system-codeigniter/license.html
  * @license        http://opensource.org/licenses/MIT	MIT License
  * @link           http://circle-creative.com/products/o2system-codeigniter.html
@@ -42,7 +42,8 @@ namespace O2System\Template\Drivers;
 // ------------------------------------------------------------------------
 
 use O2System\Bootstrap\Factory\Tag;
-use O2System\Glob\Interfaces\Drivers;
+use O2System\Glob\ArrayObject;
+use O2System\Glob\Interfaces\DriverInterface;
 
 use MatthiasMullie\Minify;
 use O2System\Cache;
@@ -58,745 +59,630 @@ use O2System\Cache;
  * @author        Steeven Andrian Salim
  * @link          http://o2system.center/framework/user-guide/library/template/drivers/assets.html
  */
-final class Assets extends Drivers
+final class Assets extends DriverInterface
 {
-	/**
-	 * Class Config
-	 *
-	 * @access  public
-	 *
-	 * @type    array
-	 */
-	public $config;
+	private $storage;
 
-	/**
-	 * Assets Paths
-	 *
-	 * List of assets paths
-	 *
-	 * @access  protected
-	 *
-	 * @type array
-	 */
-	protected $_paths = array();
-
-	protected $_header = array();
-
-	protected $_footer = array();
-
-	protected $_frameworks = array(
-		'jquery',
-		'jquery-ui',
-		'bootstrap',
+	protected $_collections = array(
+		'fonts'   => array(),
+		'icons'   => array(),
+		'core'    => array(),
+		'plugins' => array(),
+		'module'  => array(),
+		'theme'   => array(),
+		'custom'  => array(),
+		'inline'  => array(),
 	);
-
-	/**
-	 * CSS Assets
-	 *
-	 * List of loaded css assets
-	 *
-	 * @access  private
-	 *
-	 * @type    array
-	 */
-	protected $_css = array();
-
-	/**
-	 * Javascript Assets
-	 *
-	 * List of loaded javascripts assets
-	 *
-	 * @access  private
-	 *
-	 * @type    array
-	 */
-	protected $_js = array();
-
-	/**
-	 * Assets Output
-	 *
-	 * @access  private
-	 *
-	 * @type    array
-	 */
-	protected $_output;
 
 	// ------------------------------------------------------------------------
 
-	/**
-	 * Class Constructor
-	 *
-	 * @access  public
-	 */
-	public function __reconstruct()
+	public function is_collected( $asset, $group )
 	{
-		$this->destroy();
+
 	}
 
-	// --------------------------------------------------------------------
-
-	final public function destroy()
+	public function add_assets( array $assets, $group = 'custom' )
 	{
-		$this->_output = new \stdClass();
-		$this->_output->header = array();
-		$this->_output->footer = array();
-	}
-
-	/**
-	 * @param $paths
-	 *
-	 * @return $this
-	 */
-	final public function add_paths( $paths )
-	{
-		if ( is_array( $paths ) )
+		if ( isset( $this->_collections[ $group ] ) )
 		{
-			foreach ( $paths as $path )
+			if ( is_string( key( $assets ) ) )
 			{
-				$this->add_paths( $path );
+				$this->_collections[ $group ] = array_merge( $this->_collections[ $group ], $assets );
 			}
-		}
-		elseif ( is_dir( $paths = $paths . 'assets' . DIRECTORY_SEPARATOR ) )
-		{
-			$this->_paths[] = $paths;
+			elseif ( is_numeric( key( $assets ) ) )
+			{
+				if ( empty( $this->_collections[ $group ][ 'css' ] ) )
+				{
+					$this->_collections[ $group ][ 'css' ] = $assets;
+				}
+				else
+				{
+					$this->_collections[ $group ][ 'css' ] = array_unique( array_merge( $this->_collections[ $group ][ 'css' ], $assets ) );
+				}
+
+				if ( empty( $this->_collections[ $group ][ 'js' ] ) )
+				{
+					$this->_collections[ $group ][ 'js' ] = $assets;
+				}
+				else
+				{
+					$this->_collections[ $group ][ 'js' ] = array_unique( array_merge( $this->_collections[ $group ][ 'js' ], $assets ) );
+				}
+			}
 		}
 
 		return $this;
 	}
-	// --------------------------------------------------------------------
 
-	/**
-	 * Parse Theme Settings
-	 *
-	 * @param array $settings
-	 */
-	final public function parse_settings( array $settings = array() )
+	public function add_asset( $asset, $group = 'custom' )
 	{
-		// Load jQuery
-		$this->_load_js( 'jquery' );
-
-		// Load Bootstrap
-		$this->_load_packages( [ 'package' => 'bootstrap', 'theme' => 'no-theme' ] );
-
-		// Load jQuery-UI Package
-		$this->_load_packages( [ 'package' => 'jquery-ui', 'theme' => 'no-theme' ] );
-
-
-		if ( count( $settings ) == 0 ) return;
-
-		foreach ( $settings as $extension => $assets )
+		if ( isset( $this->_collections[ $group ] ) )
 		{
-			if ( method_exists( $this, $method = '_load_' . $extension ) )
+			if ( ! in_array( $asset, $this->_collections[ $group ] ) )
 			{
-				if ( is_array( $assets ) )
+				$ext = pathinfo( $asset, PATHINFO_EXTENSION );
+
+				if ( empty( $ext ) )
 				{
-					if ( $extension === 'packages' )
-					{
-						foreach ( $assets as $asset )
-						{
-							$this->{$method}( $asset );
-						}
-					}
-					else
-					{
-						foreach ( $assets as $asset )
-						{
-							$this->{$method}( $asset );
-						}
-					}
+					$this->_collections[ $group ][ 'css' ][ $asset ] = $asset;
+					$this->_collections[ $group ][ 'js' ][ $asset ] = $asset;
 				}
 				else
 				{
-					$this->{$method}( $assets );
+					$this->_collections[ $group ][ $ext ][ $asset ] = $asset;
 				}
 			}
 		}
+
+		return $this;
 	}
 
-	final public function path_to_url( $path )
+	public function add_css( $css, $attr = NULL, $group = 'custom' )
 	{
-		$base_url = isset( $_SERVER[ 'REQUEST_SCHEME' ] ) ? $_SERVER[ 'REQUEST_SCHEME' ] : 'http';
-		$base_url .= '://' . $_SERVER[ 'SERVER_NAME' ];
-
-		// Add server port if needed
-		$base_url .= $_SERVER[ 'SERVER_PORT' ] !== '80' ? ':' . $_SERVER[ 'SERVER_PORT' ] : '';
-
-		// Add base path
-		$base_url .= dirname( $_SERVER[ 'SCRIPT_NAME' ] );
-		$base_url = str_replace( DIRECTORY_SEPARATOR, '/', $base_url );
-		$base_url = trim( $base_url, '/' ) . '/';
-
-		// Vendor directory
-		$base_dir = explode( 'vendor' . DIRECTORY_SEPARATOR . 'o2system', __DIR__ );
-		$base_dir = str_replace( [ 'o2system', '/' ], [ '', DIRECTORY_SEPARATOR ], $base_dir[ 0 ] );
-		$base_dir = trim( $base_dir, DIRECTORY_SEPARATOR );
-
-		$path = str_replace( [ $base_dir, DIRECTORY_SEPARATOR ], [ '', '/' ], $path );
-		$path = trim( $path, '/' );
-
-		return trim( $base_url . $path, '/' );
-	}
-
-	final protected function _load_css( $css )
-	{
-		if ( is_array( $css ) AND isset( $css[ 'src' ] ) )
+		if ( is_string( $attr ) )
 		{
-			foreach ( $this->_paths as $path )
-			{
-				if ( file_exists( $filepath = $path . 'css' . DIRECTORY_SEPARATOR . $css[ 'src' ] . '.css' ) )
-				{
-					$css[ 'realpath' ] = $filepath;
-					$this->link_css( $this->path_to_url( $filepath ), $css );
-					break;
-				}
-			}
-		}
-		elseif ( strpos( $css, '://' ) !== FALSE )
-		{
-			$this->link_css( $css );
-		}
-		else
-		{
-			foreach ( $this->_paths as $path )
-			{
-				if ( file_exists( $filepath = $path . 'css' . DIRECTORY_SEPARATOR . $css . '.css' ) )
-				{
-					$this->link_css( $this->path_to_url( $filepath ), [ 'realpath' => $filepath ] );
-					break;
-				}
-			}
-		}
-	}
-
-	final protected function _load_js( $js )
-	{
-		if ( is_array( $js ) AND isset( $js[ 'src' ] ) )
-		{
-			foreach ( $this->_paths as $path )
-			{
-				if ( file_exists( $filepath = $path . 'js' . DIRECTORY_SEPARATOR . $js[ 'src' ] . '.js' ) )
-				{
-					$js[ 'realpath' ] = $filepath;
-					$this->link_js( $this->path_to_url( $filepath ), $js );
-					break;
-				}
-			}
-		}
-		elseif ( strpos( $js, '://' ) !== FALSE )
-		{
-			$this->link_js( $js );
-		}
-		else
-		{
-			foreach ( $this->_paths as $path )
-			{
-				if ( file_exists( $filepath = $path . 'js' . DIRECTORY_SEPARATOR . $js . '.js' ) )
-				{
-					$this->link_js( $this->path_to_url( $filepath ), [ 'realpath' => $filepath ] );
-					break;
-				}
-			}
-		}
-	}
-
-	/**
-	 * Link Icons
-	 *
-	 * @access  public
-	 * @final   This method can't be overwritten
-	 *
-	 * @param   string $src  CSS Link Href
-	 * @param   array  $attr CSS Link Attributes
-	 */
-	final public function link_icons( $src, array $attr = array() )
-	{
-		if ( empty( $attr ) )
-		{
+			$group = $attr;
 			$attr = array(
-				'media' => 'shortcut-icon',
-				'rel'   => 'favicon.ico',
-				'type'  => 'image/x-icon',
-			);
-		}
-
-		$attr[ 'href' ] = $src;
-
-		$this->_header[ 'icons' ][ pathinfo( $src, PATHINFO_FILENAME ) ] = $attr;
-	}
-
-	final protected function _load_icons( $icons )
-	{
-		if ( is_array( $icons ) AND isset( $icons[ 'src' ] ) )
-		{
-			foreach ( $this->_paths as $path )
-			{
-				if ( file_exists( $filepath = $path . 'images' . DIRECTORY_SEPARATOR . 'icons' . DIRECTORY_SEPARATOR . $icons[ 'src' ] ) )
-				{
-					$this->link_icons( $this->path_to_url( $filepath ), $icons );
-					break;
-				}
-			}
-		}
-		elseif ( strpos( $icons, '://' ) !== FALSE )
-		{
-			$this->link_icons( $icons );
-		}
-		else
-		{
-			foreach ( $this->_paths as $path )
-			{
-				if ( file_exists( $filepath = $path . 'images' . DIRECTORY_SEPARATOR . 'icons' . DIRECTORY_SEPARATOR . $icons ) )
-				{
-					$this->link_icons( $this->path_to_url( $filepath ) );
-					break;
-				}
-			}
-		}
-	}
-
-
-	/**
-	 * Link Fonts
-	 *
-	 * @access  public
-	 * @final   This method can't be overwritten
-	 *
-	 * @param   string $src  CSS Link Href
-	 * @param   array  $attr CSS Link Attributes
-	 */
-	final public function link_fonts( $src, $path = NULL, array $attr = array() )
-	{
-		if ( empty( $attr ) )
-		{
-			$attr = array(
-				'media' => 'screen',
+				'media' => 'all',
 				'rel'   => 'stylesheet',
 				'type'  => 'text/css',
 			);
 		}
-
-		$attr[ 'href' ] = $src;
-
-		$this->_header[ 'font' ][ pathinfo( $src, PATHINFO_FILENAME ) ] = $attr;
-	}
-
-	final protected function _load_fonts( $fonts )
-	{
-		if ( is_array( $fonts ) AND isset( $fonts[ 'src' ] ) )
+		elseif ( is_array( $attr ) )
 		{
-			foreach ( $this->_paths as $path )
+			$attr = array_merge( array(
+				                     'media' => 'all',
+				                     'rel'   => 'stylesheet',
+				                     'type'  => 'text/css',
+			                     ), $attr );
+		}
+
+		if ( isset( $this->_collections[ $group ][ 'css' ] ) )
+		{
+			if ( in_array( $css, $this->_collections[ $group ][ 'css' ] ) )
 			{
-				if ( file_exists( $filepath = $path . 'fonts' . DIRECTORY_SEPARATOR . $fonts[ 'src' ] . DIRECTORY_SEPARATOR . $fonts[ 'src' ] . '.css' ) )
-				{
-					$this->link_fonts( $this->path_to_url( $this->path_to_url( $filepath ), $fonts ), [ 'realpath' => $filepath ] );
-					break;
-				}
+				return $this;
 			}
 		}
-		elseif ( strpos( $fonts, '://' ) !== FALSE )
+
+		if ( is_file( $css ) )
 		{
-			$this->link_fonts( $fonts );
+			$attr[ 'realpath' ] = $css;
+			$this->_collections[ $group ][ 'css' ][ pathinfo( $css, PATHINFO_FILENAME ) ] = new Tag( 'link', $attr );
+		}
+		elseif ( strpos( $css, '://' ) !== FALSE )
+		{
+			$attr[ 'src' ] = $css;
+			$this->_collections[ $group ][ 'css' ][ pathinfo( $css, PATHINFO_FILENAME ) ] = new Tag( 'link', $attr );
+		}
+		elseif ( $group === 'inline' )
+		{
+			$this->_collections[ 'inline' ][ 'css' ][ md5( $css ) ] = $css;
 		}
 		else
 		{
-			foreach ( $this->_paths as $path )
+			$this->_collections[ $group ][ 'css' ][ $css ] = $css;
+		}
+
+		return $this;
+	}
+
+	public function add_js( $js, $attr = array(), $group = 'custom' )
+	{
+		if ( is_string( $attr ) )
+		{
+			$group = $attr;
+			$attr = array(
+				'type'  => 'text/javascript',
+				'defer' => 'defer',
+			);
+		}
+		elseif ( is_array( $attr ) )
+		{
+			$attr = array_merge( $attr, array(
+				'type'  => 'text/javascript',
+				'defer' => 'defer',
+			) );
+		}
+
+		if ( isset( $this->_collections[ $group ][ 'js' ] ) )
+		{
+			if ( in_array( $js, $this->_collections[ $group ][ 'js' ] ) )
 			{
-				if ( file_exists( $filepath = $path . 'fonts' . DIRECTORY_SEPARATOR . $fonts . DIRECTORY_SEPARATOR . $fonts . '.css' ) )
+				return $this;
+			}
+		}
+
+		if ( is_file( $js ) )
+		{
+			$attr[ 'realpath' ] = $js;
+			$this->_collections[ $group ][ 'js' ][ pathinfo( $js, PATHINFO_FILENAME ) ] = new Tag( 'script', $attr );
+		}
+		elseif ( strpos( $js, '://' ) !== FALSE )
+		{
+			$attr[ 'src' ] = $js;
+			$this->_collections[ $group ][ 'js' ][ pathinfo( $js, PATHINFO_FILENAME ) ] = new Tag( 'script', $attr );
+		}
+		elseif ( $group === 'inline' )
+		{
+			$this->_collections[ 'inline' ][ 'js' ][ md5( $js ) ] = $js;
+		}
+		else
+		{
+			$this->_collections[ $group ][ 'js' ][ $js ] = $js;
+		}
+
+		return $this;
+	}
+
+	public function add_fonts( $fonts )
+	{
+		$this->add_assets( $fonts );
+	}
+
+	public function add_font( $font, $attr = array() )
+	{
+		$this->add_css( $font, $attr, 'fonts' );
+	}
+
+	public function add_icons( $icons )
+	{
+		foreach ( $icons as $icon )
+		{
+			$this->add_icon( $icon );
+		}
+	}
+
+	public function add_icon( $icon, $attr = array() )
+	{
+		$attr = array_merge( array(
+			                     'rel'  => 'shortcut-icon',
+			                     'type' => 'image/x-icon',
+		                     ), $attr );
+
+		if ( isset( $this->_collections[ 'icons' ][ 'css' ] ) )
+		{
+			if ( ! in_array( $icon, $this->_collections[ 'icons' ][ 'css' ] ) )
+			{
+				if ( is_file( $icon ) )
 				{
-					$this->link_fonts( $this->path_to_url( $filepath ), [ 'realpath' => $filepath ] );
-					break;
+					$attr[ 'realpath' ] = $icon;
+
+					$this->_collections[ 'icons' ][ pathinfo( $icon, PATHINFO_FILENAME ) ] = new Tag( 'link', $attr );
+				}
+				elseif ( strpos( $icon, '://' ) !== FALSE )
+				{
+					$attr[ 'src' ] = $icon;
+
+					$this->_collections[ 'icons' ][ pathinfo( $icon, PATHINFO_FILENAME ) ] = new Tag( 'link', $attr );
+				}
+				else
+				{
+					$this->_collections[ 'icons' ][] = $icon;
+				}
+			}
+		}
+
+		return $this;
+	}
+
+	public function add_packages( array $packages, $group = 'plugins' )
+	{
+		foreach ( $packages as $package )
+		{
+			$this->add_package( $package, $group );
+		}
+	}
+
+	public function add_package( $package, $group = 'plugins' )
+	{
+		$this->_collections[ $group ]['packages'][] = $package;
+	}
+
+	private function __inlineCss( $collection )
+	{
+		$this->storage[ 'css' ][ 'inline' ] = new Tag( 'style', implode( PHP_EOL, $collection ), array(
+			'media' => 'all',
+			'rel'   => 'stylesheet',
+			'type'  => 'text/css',
+		) );
+	}
+
+	private function __inlineJs( $collection )
+	{
+		$this->storage[ 'js' ][ 'inline' ] = new Tag( 'script', implode( PHP_EOL, $collection ), array(
+			'type'  => 'text/javascript',
+		) );
+	}
+
+	private function __fetchCss( $collection )
+	{
+		foreach ( $collection as $key => $css )
+		{
+			if ( $css instanceof Tag )
+			{
+				$this->storage[ 'css' ][ $key ] = $css;
+			}
+			elseif ( strpos( $css, '://' ) !== FALSE )
+			{
+				$key = is_numeric( $key ) ? pathinfo( $css, PATHINFO_FILENAME ) : $key;
+
+				$this->storage[ 'css' ][ $key ] = new Tag( 'link', array(
+					'media' => 'all',
+					'rel'   => 'stylesheet',
+					'type'  => 'text/css',
+					'href'  => $css,
+				) );
+			}
+			else
+			{
+				$filepath = $this->__loadCss( $css );
+
+				if ( $filepath )
+				{
+					$key = is_numeric( $key ) ? pathinfo( $filepath, PATHINFO_FILENAME ) : $key;
+
+					$this->storage[ 'css' ][ $key ] = new Tag( 'link', array(
+						'media'    => 'all',
+						'rel'      => 'stylesheet',
+						'type'     => 'text/css',
+						'realpath' => $filepath,
+						'href'     => path_to_url( $filepath ),
+					) );
 				}
 			}
 		}
 	}
 
-	final protected function _load_packages( $package )
+	private function __fetchJs( $collection )
 	{
-		if ( is_array( $package ) )
+		foreach ( $collection as $key => $js )
 		{
-			if ( isset( $package[ 'package' ] ) )
+			if ( $js instanceof Tag )
 			{
-				foreach ( $this->_paths as $path )
+				$this->storage[ 'js' ][ $key ] = $js;
+			}
+			elseif ( strpos( $js, '://' ) !== FALSE )
+			{
+				$key = is_numeric( $key ) ? pathinfo( $js, PATHINFO_FILENAME ) : $key;
+
+				$this->storage[ 'js' ][ $key ] = new Tag( 'script', array(
+					'type'  => 'text/javascript',
+					'defer' => 'defer',
+					'src'   => $js,
+				) );
+			}
+			else
+			{
+				$filepath = $this->__loadJs( $js );
+
+				if ( $filepath )
 				{
-					if ( is_dir( $set_path = $path . 'packages' . DIRECTORY_SEPARATOR . $package[ 'package' ] . DIRECTORY_SEPARATOR ) )
+					$key = is_numeric( $key ) ? pathinfo( $filepath, PATHINFO_FILENAME ) : $key;
+
+					$this->storage[ 'js' ][ $key ] = new Tag( 'script', array(
+						'type'     => 'text/javascript',
+						'defer'    => 'defer',
+						'realpath' => $filepath,
+						'src'      => path_to_url( $filepath ),
+					) );
+				}
+			}
+		}
+	}
+
+	private function __fetchFonts( $collection )
+	{
+		foreach ( $collection as $key => $font )
+		{
+			if ( $font instanceof Tag )
+			{
+				$this->storage[ 'css' ][ $key ] = $font;
+			}
+			elseif ( strpos( $font, '://' ) !== FALSE )
+			{
+				$key = is_numeric( $key ) ? pathinfo( $font, PATHINFO_FILENAME ) : $key;
+
+				$this->storage[ 'css' ][ $key ] = new Tag( 'link', array(
+					'media' => 'all',
+					'rel'   => 'stylesheet',
+					'type'  => 'text/css',
+					'href'  => $font,
+				) );
+			}
+			else
+			{
+				$filepath = $this->__loadFont( $font );
+
+				if ( $filepath )
+				{
+					$key = is_numeric( $key ) ? pathinfo( $filepath, PATHINFO_FILENAME ) : $key;
+
+					$this->storage[ 'css' ][ $key ] = new Tag( 'link', array(
+						'media'    => 'all',
+						'rel'      => 'stylesheet',
+						'type'     => 'text/css',
+						'realpath' => $filepath,
+						'href'     => path_to_url( $filepath ),
+					) );
+				}
+			}
+		}
+	}
+
+	private function __fetchIcons( $collection )
+	{
+		foreach ( $collection as $key => $icon )
+		{
+			if ( is_array( $icon ) )
+			{
+				if ( isset( $icon[ 'src' ] ) )
+				{
+					$filepath = $this->__loadIcon( $icon[ 'src' ] );
+
+					if ( $filepath )
 					{
-						$this->_load_sets( $package[ 'package' ], $set_path );
+						$icon[ 'src' ] = path_to_url( $filepath );
 
-						// Load Package Theme
-						if ( isset( $package[ 'theme' ] ) )
-						{
-							$filenames = array(
-								'themes' . DIRECTORY_SEPARATOR . $package[ 'theme' ] . '.css',
-								'themes' . DIRECTORY_SEPARATOR . $package[ 'theme' ] . DIRECTORY_SEPARATOR . $package[ 'theme' ] . '.css',
-							);
+						$key = is_numeric( $key ) ? pathinfo( $filepath, PATHINFO_FILENAME ) : $key;
+						$this->storage[ 'icons' ][ $key ] = new Tag( 'link', $icon );
+					}
+				}
+			}
+			elseif ( is_string( $icon ) )
+			{
+				$filepath = $this->__loadIcon( $icon );
+			}
+		}
+	}
 
-							foreach ( $filenames as $filename )
-							{
-								if ( file_exists( $filepath = $set_path . $filename ) )
-								{
-									$this->link_css( $this->path_to_url( $filepath ), [ 'realpath' => $filepath ] );
-									break;
-								}
-							}
-						}
 
-						// Load Package Plugin
-						if ( isset( $package[ 'plugins' ] ) )
-						{
-							if ( is_array( $package[ 'plugins' ] ) )
-							{
-								foreach ( $package[ 'plugins' ] as $plugin )
-								{
-									$this->_load_sets( $plugin, $set_path . 'plugins' . DIRECTORY_SEPARATOR );
-								}
-							}
-							else
-							{
-								$this->_load_sets( $package[ 'plugins' ], $set_path . 'plugins' . DIRECTORY_SEPARATOR );
-							}
-						}
+	private function __fetchPackages( $collection )
+	{
+		foreach ( $collection as $key => $package )
+		{
+			if ( is_string( $package ) )
+			{
+				$this->__loadPackage( $package );
+			}
+			else
+			{
+				$package_path = $this->__loadPackage( $package[ 'package' ] );
+
+				// Load Package Theme
+				if ( array_key_exists( 'theme', $package ) )
+				{
+					$this->__loadPackageTheme( $package[ 'theme' ], $package_path );
+				}
+
+				// Load Package Plugin
+				if ( array_key_exists( 'plugins', $package ) )
+				{
+					$this->__loadPackagePlugins( $package[ 'plugins' ], $package_path );
+				}
+			}
+		}
+	}
+
+	private function __loadCss( $css, $css_path = NULL )
+	{
+		if ( is_null( $css_path ) )
+		{
+			foreach ( $this->_library->_paths as $path )
+			{
+				if ( is_dir( $css_path = $path . 'assets' . DIRECTORY_SEPARATOR . 'css' . DIRECTORY_SEPARATOR ) )
+				{
+					if ( is_file( $css_path . $css . '.css' ) )
+					{
+						return $css_path . $css . '.css';
+						break;
 					}
 				}
 			}
 		}
+
+		if ( is_file( $filepath = $css_path . $css . '.css' ) )
+		{
+			$this->storage[ 'css' ][ $css ] = new Tag( 'link', array(
+				'media'    => 'all',
+				'rel'      => 'stylesheet',
+				'type'     => 'text/css',
+				'realpath' => $filepath,
+				'href'     => path_to_url( $filepath ),
+			) );
+
+			return TRUE;
+		}
+
+		return FALSE;
+	}
+
+	private function __loadJs( $js, $js_path = NULL )
+	{
+		if ( is_null( $js_path ) )
+		{
+			foreach ( $this->_library->_paths as $path )
+			{
+				if ( is_dir( $js_path = $path . 'assets' . DIRECTORY_SEPARATOR . 'js' . DIRECTORY_SEPARATOR ) )
+				{
+					if ( is_file( $js_path . $js . '.js' ) )
+					{
+						return $js_path . $js . '.js';
+						break;
+					}
+				}
+			}
+		}
+
+		if ( is_file( $filepath = $js_path . $js . '.js' ) )
+		{
+			$this->storage[ 'js' ][ $js ] = new Tag( 'script', array(
+				'type'     => 'text/javascript',
+				'defer'    => 'defer',
+				'realpath' => $filepath,
+				'src'      => path_to_url( $filepath ),
+			) );
+		}
+
+		return FALSE;
+	}
+
+	private function __loadFont( $font, $font_path = NULL )
+	{
+		if ( is_null( $font_path ) )
+		{
+			foreach ( $this->_library->_paths as $path )
+			{
+				if ( is_dir( $font_path = $path . 'assets' . DIRECTORY_SEPARATOR . 'fonts' . DIRECTORY_SEPARATOR . $font . DIRECTORY_SEPARATOR ) )
+				{
+					if ( is_file( $font_path . $font . '.css' ) )
+					{
+						return $font_path . $font . '.css';
+						break;
+					}
+				}
+			}
+		}
+
+		if ( is_file( $filepath = $font_path . $font . DIRECTORY_SEPARATOR . $font . '.css' ) )
+		{
+			return $filepath;
+		}
+
+		return FALSE;
+	}
+
+	private function __loadIcon( $icon, $icon_path = NULL )
+	{
+		if ( is_null( $icon_path ) )
+		{
+			foreach ( $this->_library->_paths as $path )
+			{
+				if ( is_dir( $icon_path = $path . 'assets' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'icons' . DIRECTORY_SEPARATOR ) )
+				{
+					if ( is_file( $icon_path . $icon ) )
+					{
+						return $icon_path . $icon;
+						break;
+					}
+				}
+			}
+		}
+
+		if ( is_file( $filepath = $icon_path . $icon ) )
+		{
+			return $filepath;
+		}
+
+		return FALSE;
+	}
+
+	private function __loadPackage( $package, $package_path = NULL )
+	{
+		if ( is_null( $package_path ) )
+		{
+			foreach ( $this->_library->_paths as $path )
+			{
+				if ( is_dir( $package_path = $path . 'assets' . DIRECTORY_SEPARATOR . 'packages' . DIRECTORY_SEPARATOR . $package . DIRECTORY_SEPARATOR ) )
+				{
+					$this->__loadCSS( $package, $package_path );
+					$this->__loadJS( $package, $package_path );
+
+					return $package_path;
+
+					break;
+				}
+			}
+		}
 		else
 		{
-			foreach ( $this->_paths as $path )
+			if ( is_dir( $package_path ) )
 			{
-				if ( is_dir( $set_path = $path . 'packages' . DIRECTORY_SEPARATOR . $package . DIRECTORY_SEPARATOR ) )
-				{
-					$this->_load_sets( $package, $set_path );
-				}
+				$this->__loadCSS( $package, $package_path );
+				$this->__loadJS( $package, $package_path );
+
+				return $package_path;
 			}
+		}
+
+		return FALSE;
+	}
+
+	private function __loadPackageTheme( $theme, $package_path )
+	{
+		if ( is_dir( $theme_path = $package_path . 'themes' . DIRECTORY_SEPARATOR . $theme . DIRECTORY_SEPARATOR ) )
+		{
+			return $this->__loadCSS( $theme, $theme_path );
+		}
+
+		return FALSE;
+	}
+
+	private function __loadPackagePlugins( $plugins, $package_path )
+	{
+		if ( is_array( $plugins ) )
+		{
+			foreach ( $plugins as $plugin )
+			{
+				$this->__loadPackagePlugins( $plugin, $package_path );
+			}
+		}
+		elseif ( is_string( $plugins ) )
+		{
+			if ( is_dir( $plugin_path = $package_path . 'plugins' . DIRECTORY_SEPARATOR . $plugins . DIRECTORY_SEPARATOR ) )
+			{
+				$this->__loadCSS( $plugins, $plugin_path );
+
+				return $this->__loadJS( $plugins, $plugin_path );
+			}
+			elseif ( is_file( $plugin_path = $package_path . $plugins . '.js' ) )
+			{
+				return $this->__loadJS( $plugins, $plugin_path );
+			}
+
+			return FALSE;
 		}
 	}
 
-	final protected function _load_sets( $set, $path )
+
+	public function __get( $property )
 	{
-		// Load CSS
-		if ( file_exists( $filepath = $path . $set . '.css' ) )
+		if ( empty( $this->storage ) )
 		{
-			$this->link_css( $this->path_to_url( $filepath ), [ 'realpath' => $filepath ] );
+			$this->render();
 		}
 
-		// Load JS
-		if ( file_exists( $filepath = $path . $set . '.js' ) )
-		{
-			$this->link_js( $this->path_to_url( $filepath ), [ 'realpath' => $filepath ] );
-		}
-	}
+		$properties_map = array(
+			'header' => 'css',
+			'footer' => 'js',
+		);
 
-	/**
-	 * Link CSS
-	 *
-	 * @access  public
-	 * @final   This method can't be overwritten
-	 *
-	 * @param   string $src  CSS Link Href
-	 * @param   array  $attr CSS Link Attributes
-	 */
-	final public function link_css( $href, $path = NULL, array $attr = array() )
-	{
-		if ( empty( $attr ) )
+		if ( isset( $properties_map[ $property ] ) )
 		{
-			$attr = array(
-				'media' => 'screen',
-				'rel'   => 'stylesheet',
-				'type'  => 'text/css',
-			);
+			return $this->storage[ $properties_map[ $property ] ];
 		}
 
-		$attr[ 'href' ] = $href;
-
-		if ( is_array( $path ) )
-		{
-			$attr = array_merge( $attr, $path );
-		}
-
-
-		$this->_header[ 'links' ][ pathinfo( $href, PATHINFO_FILENAME ) ] = $attr;
-	}
-	// --------------------------------------------------------------------
-
-	/**
-	 * Stringify attributes for use in HTML tags.
-	 *
-	 * Helper function used to convert a string, array, or object
-	 * of attributes to a string.
-	 *
-	 * @param    mixed    string, array, object
-	 * @param    bool
-	 *
-	 * @return    string
-	 */
-	protected function _stringify_attributes( $attributes, $js = FALSE )
-	{
-		$atts = NULL;
-
-		if ( empty( $attributes ) )
-		{
-			return $atts;
-		}
-
-		if ( is_string( $attributes ) )
-		{
-			return ' ' . $attributes;
-		}
-
-		$attributes = (array) $attributes;
-
-		foreach ( $attributes as $key => $val )
-		{
-			$atts .= ( $js ) ? $key . '=' . $val . ',' : ' ' . $key . '="' . $val . '"';
-		}
-
-		return rtrim( $atts, ',' );
-	}
-
-	/**
-	 * Inline CSS
-	 *
-	 * @access  public
-	 * @final   This method can't be overwritten
-	 *
-	 * @param   string $inline_code CSS Source Code
-	 * @param   array  $attributes  CSS Tag Attributes
-	 */
-	final public function inline_css( $inline_code, array $attributes = array() )
-	{
-		if ( ! empty( $inline_code ) )
-		{
-			if ( empty( $attributes ) )
-			{
-				$attributes = array(
-					'media' => 'screen',
-					'rel'   => 'stylesheet',
-					'type'  => 'text/css',
-				);
-			}
-
-			$this->_header[ 'inline_css' ][ $this->_stringify_attributes( $attributes ) ][] = trim( $inline_code );
-		}
-	}
-	// --------------------------------------------------------------------
-
-	/**
-	 * Javascript Link
-	 *
-	 * @access  public
-	 * @final   This method can't be overwritten
-	 *
-	 * @param   string $src      Javascript Link Href
-	 * @param   array  $attr     Javascript Link Attributes
-	 * @param   string $position Javascript Asset Position on HTML Source Code header|footer
-	 */
-	final public function link_js( $src, $path = NULL, array $attr = array(), $position = 'footer' )
-	{
-		if ( empty( $attr ) )
-		{
-			$attr = array(
-				'type' => 'text/javascript',
-			);
-		}
-
-		$attr[ 'src' ] = $src;
-
-		if ( is_array( $path ) )
-		{
-			$attr = array_merge( $attr, $path );
-		}
-
-		$this->{'_' . $position}[ 'scripts' ][ pathinfo( $src, PATHINFO_FILENAME ) ] = $attr;
-
-	}
-	// --------------------------------------------------------------------
-
-	/**
-	 * Inline Javascript Code
-	 *
-	 * @access  public
-	 * @final   This method can't be overwritten
-	 *
-	 * @param   string $inline_code Javascript Source Code
-	 * @param   array  $attributes  Javascript Tag Attributes
-	 */
-	final public function inline_js( $inline_code, array $attributes = array(), $position = 'footer' )
-	{
-		if ( ! empty( $inline_code ) )
-		{
-			if ( empty( $attributes ) )
-			{
-				$attributes = array(
-					'type' => 'text/javascript',
-				);
-			}
-
-			$this->{'_' . $position}[ 'inline_js' ][ $this->_stringify_attributes( $attributes ) ][] = trim( $inline_code );
-		}
-	}
-
-	// --------------------------------------------------------------------
-
-	protected function _gather_assets()
-	{
-		// Icon Link Output
-		if ( ! empty( $this->_header[ 'icons' ] ) )
-		{
-			foreach ( $this->_header[ 'icons' ] as $key => $attr )
-			{
-				unset( $attr[ 'realpath' ] );
-				$this->_output->header[] = ( new Tag( 'link', $attr ) )->render();
-			}
-		}
-
-		// Fonts Link Output
-		if ( ! empty( $this->_header[ 'font' ] ) )
-		{
-			foreach ( $this->_header[ 'font' ] as $key => $attr )
-			{
-				unset( $attr[ 'realpath' ] );
-				$this->_output->header[] = ( new Tag( 'link', $attr ) )->render();
-			}
-		}
-
-		// Header Link Output
-		if ( ! empty( $this->_header[ 'links' ] ) )
-		{
-			foreach ( $this->_header[ 'links' ] as $key => $attr )
-			{
-				unset( $attr[ 'realpath' ] );
-				$this->_output->header[] = ( new Tag( 'link', $attr ) )->render();
-			}
-		}
-
-		// Header Inline CSS
-		if ( ! empty( $this->_header[ 'inline_css' ] ) )
-		{
-			$styles = array_unique( $this->_header[ 'inline_css' ] );
-			foreach ( $styles as $attr => $style )
-			{
-				$inline_css = ( new Tag( 'style', implode( PHP_EOL, $style ), array( $attr ) ) )->render();
-				$this->_output->header[] = $inline_css;
-			}
-		}
-
-		// Footer Link Script
-		if ( ! empty( $this->_footer[ 'scripts' ] ) )
-		{
-			foreach ( $this->_footer[ 'scripts' ] as $key => $attr )
-			{
-				unset( $attr[ 'realpath' ] );
-				$this->_output->footer[] = ( new Tag( 'script', $attr ) )->render();
-			}
-		}
-
-		// Footer Inline Script
-		if ( ! empty( $this->_footer[ 'inline_js' ] ) )
-		{
-			$scripts = array_unique( $this->_footer[ 'inline_js' ] );
-
-			foreach ( $scripts as $attr => $script )
-			{
-				$this->_output->footer[] = ( new Tag( 'script', $attr ) )->render();
-			}
-		}
-	}
-
-	protected function _combine_assets()
-	{
-		$inline_css = '';
-
-		// Header Link Output
-		if ( ! empty( $this->_header[ 'links' ] ) )
-		{
-			//print_out($this->_header['links']);
-			foreach ( $this->_header[ 'links' ] as $key => $attr )
-			{
-				if ( isset( $attr[ 'realpath' ] ) )
-				{
-					$minifier = new Minify\CSS( $attr[ 'realpath' ] );
-					$output[] = $minifier->minify();
-				}
-				elseif ( isset( $attr[ 'href' ] ) )
-				{
-					unset( $attr[ 'realpath' ] );
-					$this->_output->header[] = '<link' . $this->_stringify_attributes( $attr ) . '>';
-				}
-			}
-
-			$this->_output->header[] = '<style type="text/css">' . implode( PHP_EOL, $output ) . '</style>';
-		}
-
-		// Header Inline CSS
-		if ( ! empty( $this->_header[ 'inline_css' ] ) )
-		{
-			$styles = array_unique( $this->_header[ 'inline_css' ] );
-			foreach ( $styles as $attr => $style )
-			{
-				$inline_css = "<style" . $attr . ">\n";
-				$inline_css .= implode( "\n", $style );
-				$inline_css .= "\n</style>\n";
-
-				$this->_output->header[] = $inline_css;
-			}
-		}
-
-		//header fonts
-		if ( ! empty( $this->_header[ 'fonts' ] ) )
-		{
-			foreach ( $this->_header[ 'fonts' ] as $key => $attr )
-			{
-				unset( $attr[ 'realpath' ] );
-				$this->_output->header[] = '<link' . $this->_stringify_attributes( $attr ) . '>';
-			}
-		}
-
-		//header icons
-		if ( ! empty( $this->_header[ 'icons' ] ) )
-		{
-			foreach ( $this->_header[ 'icons' ] as $key => $attr )
-			{
-				unset( $attr[ 'realpath' ] );
-				$this->_output->header[] = '<link' . $this->_stringify_attributes( $attr ) . '>';
-			}
-		}
-
-		// Footer Link Script
-		if ( ! empty( $this->_footer[ 'scripts' ] ) )
-		{
-
-			//print_out($this->_footer[ 'scripts' ]);
-			foreach ( $this->_footer[ 'scripts' ] as $key => $attr )
-			{
-				if ( isset( $attr[ 'realpath' ] ) )
-				{
-					$jsminifier = new Minify\JS( $attr[ 'realpath' ] );
-					$jsoutput[] = $jsminifier->minify();
-				}
-				elseif ( isset( $attr[ 'src' ] ) )
-				{
-					unset( $attr[ 'realpath' ] );
-					$this->_output->footer[] = '<script' . $this->_stringify_attributes( $attr ) . '></script>';
-				}
-			}
-
-			$this->_output->footer[] = "<script type='text/javascript'>" . implode( PHP_EOL, $jsoutput ) . "</script>";
-		}
-
-		// Footer Inline Script
-		if ( ! empty( $this->_footer[ 'inline_js' ] ) )
-		{
-			$scripts = array_unique( $this->_footer[ 'inline_js' ] );
-
-			foreach ( $scripts as $attr => $script )
-			{
-				$inline_js = "<script" . $attr . ">\n";
-				$inline_js .= implode( "\n", $script );
-				$inline_js .= "\n</script>\n";
-
-				$this->_output->footer[] = $inline_js;
-			}
-		}
+		return $this->storage[ $property ];
 	}
 
 	/**
@@ -807,19 +693,43 @@ final class Assets extends Drivers
 	 *
 	 * @return string
 	 */
-	final public function render()
+	public function render()
 	{
-		$this->_config[ 'combine' ] === TRUE ? $this->_combine_assets() : $this->_gather_assets();
+		$this->storage = new \O2System\Template\Collections\Assets();
 
-		// Implode all assets
-		$output = new \stdClass();
-		$output->header = implode( PHP_EOL, $this->_output->header );
-		$output->footer = implode( PHP_EOL, $this->_output->footer );
+		foreach ( $this->_collections as $group => $collection )
+		{
+			if ( $group === 'inline' )
+			{
+				foreach ( $collection as $type => $asset )
+				{
+					if ( ! $this->storage->offsetExists( $type ) )
+					{
+						$this->storage[ $type ] = new \O2System\Template\Collections\Assets();
+					}
 
-		// Destroy Output
-		$this->destroy();
+					$this->{'__inline' . ucfirst( $type )}( $asset );
+				}
+			}
+			else
+			{
+				foreach ( $collection as $type => $asset )
+				{
+					if ( ! $this->storage->offsetExists( $type ) )
+					{
+						$this->storage[ $type ] = new \O2System\Template\Collections\Assets();
+					}
 
-		return $output;
+					$this->{'__fetch' . ucfirst( $type )}( $asset );
+				}
+			}
+		}
 
+		return $this->storage->render();
+	}
+
+	public function __toString()
+	{
+		return $this->render();
 	}
 }

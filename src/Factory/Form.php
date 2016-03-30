@@ -272,7 +272,7 @@ class Form
                 {
                     $filepath = $path . strtolower( $this->_config[ 'tpl' ] ) . EXT;
 
-                    if( file_exists( $filepath ) )
+                    if( is_file( $filepath ) )
                     {
                         return $parser->parse_view( $filepath, $output );
                         break;
