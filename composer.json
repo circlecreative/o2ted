@@ -6,7 +6,7 @@
 	"keywords": ["utilities","php","framework","driver","libraries"],
 	"authors": [
 		{
-			"name": "PT. Lingkar Kreasi (Circle Creative)",
+			"name": "",
 			"email": "developer@circle-creative.com",
 			"homepage": "http://www.circle-creative.com",
 			"role": "Founder"
@@ -39,7 +39,9 @@
 		"o2system/o2parser":"*",
 		"o2system/o2cache":"*",
         "o2system/o2bootstrap":"*",
-		"matthiasmullie/minify":"*"
+        "o2system/o2file":"*",
+		"matthiasmullie/minify":"*",
+        "sunra/php-simple-html-dom-parser":"*"
 	},
 	"autoload": {
 		"psr-4": {
