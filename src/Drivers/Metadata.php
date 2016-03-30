@@ -6,7 +6,7 @@
  *
  * This content is released under the MIT License (MIT)
  *
- * Copyright (c) 2015, PT. Lingkar Kreasi (Circle Creative).
+ * Copyright (c) 2015, .
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
  *
  * @package        O2System
  * @author         Circle Creative Dev Team
- * @copyright      Copyright (c) 2005 - 2015, PT. Lingkar Kreasi (Circle Creative).
+ * @copyright      Copyright (c) 2005 - 2015, .
  * @license        http://circle-creative.com/products/o2system-codeigniter/license.html
  * @license        http://opensource.org/licenses/MIT	MIT License
  * @link           http://circle-creative.com/products/o2system-codeigniter.html
@@ -41,7 +41,8 @@ namespace O2System\Template\Drivers;
 
 // ------------------------------------------------------------------------
 
-use O2System\Glob\Interfaces\Drivers;
+use O2System\Bootstrap\Factory\Tag;
+use O2System\Glob\Interfaces\DriverInterface;
 
 /**
  * Template Themes Driver
@@ -50,81 +51,20 @@ use O2System\Glob\Interfaces\Drivers;
  * @subpackage       Library
  * @category         Driver
  * @version          1.0 Build 11.09.2012
- * @author           Steeven Andrian Salim
- * @copyright        Copyright (c) 2005 - 2014 PT. Lingkar Kreasi (Circle Creative)
+ * @author           Circle Creative Developer Team
+ * @copyright        Copyright (c) 2005 - 2014
  * @license          http://www.circle-creative.com/products/o2system/license.html
  * @link             http://www.circle-creative.com
  */
 // ------------------------------------------------------------------------
 
-class Metadata extends Drivers
-{
-	/**
-	 * Metadata Config
-	 *
-	 * @access  public
-	 *
-	 * @type    array
-	 */
-	protected $_config = array(
-		'charset'   => 'UTF-8',
-		'separator' => '-',
-		'valid'     => array(
-			'tags'       => array(
-				'abstract',
-				'author',
-				'category',
-				'classification',
-				'copyright',
-				'coverage',
-				'description',
-				'distribution',
-				'doc-class',
-				'doc-rights',
-				'doc-type',
-				'downloadoptions',
-				'expires',
-				'designer',
-				'directory',
-				'generator',
-				'googlebot',
-				'identifier-url',
-				'keywords',
-				'language',
-				'mssmarttagspreventparsing',
-				'name',
-				'owner',
-				'progid',
-				'rating',
-				'refresh',
-				'reply-to',
-				'resource-type',
-				'revisit-after',
-				'robots',
-				'summary',
-				'title',
-				'topic',
-				'url',
-			),
-			'http_equiv' => array(
-				'cache-control',
-				'content-language',
-				'content-type',
-				'date',
-				'expires',
-				'last-modified',
-				'location',
-				'refresh',
-				'set-cookie',
-				'window-target',
-				'pragma',
-				'page-enter',
-				'page-exit',
-				'x-ua-compatible',
-			),
-		),
-	);
+use IteratorAggregate;
+use Countable;
+use ArrayAccess;
+use Traversable;
 
+class Metadata extends DriverInterface implements IteratorAggregate, Countable, ArrayAccess
+{
 	/**
 	 * Metadata Variables
 	 *
@@ -132,183 +72,141 @@ class Metadata extends Drivers
 	 *
 	 * @type    array
 	 */
-	protected $_vars = array();
-
-	/**
-	 * Browser Title
-	 *
-	 * @access  protected
-	 *
-	 * @access  public
-	 *
-	 * @type    string
-	 */
-	protected $_browser_title = array();
-
-	/**
-	 * Page Title
-	 *
-	 * @access  protected
-	 *
-	 * @type    string
-	 */
-	protected $_page_title = array();
-
-	// ------------------------------------------------------------------------
-
-	/**
-	 * Reset Metadata
-	 *
-	 * @access  public
-	 */
-	final public function reset()
-	{
-		$this->_vars = array();
-	}
-	// ------------------------------------------------------------------------
+	private $storage = array();
 
 	/**
 	 * Set Metadata Variables
 	 *
 	 * @access public
 	 *
-	 * @param   array $tags     List of Metadata Tags Variables
-	 * @param   bool  $override Replace previous metadata tag
+	 * @param   array $tags List of Metadata Tags Variables
+	 *
+	 * @return $this
 	 */
-	public function set_tags( $tags = array(), $override = FALSE )
+	public function set_meta( array $meta )
 	{
-		foreach ( $tags as $tag => $content )
-		{
-			if ( in_array( $tag, $this->_config[ 'valid' ][ 'tags' ] ) )
-			{
-				if ( $override === TRUE OR empty ( $this->_vars[ $tag ] ) )
-				{
-					$this->_vars[ $tag ] = $content;
-				}
-				elseif ( $override === FALSE )
-				{
-					$separator = ( $tag === 'title' ? ' ' . $this->_config[ 'separator' ] . ' ' : ', ' );
-					$this->_vars[ $tag ] = implode( $separator, array( $this->_vars[ $tag ], $content ) );
-				}
-			}
-		}
+		$this->storage = array();
+		$this->add_meta( $meta );
+
+		return $this;
 	}
+
 	// ------------------------------------------------------------------------
 
-
-	/**
-	 * Parse Metadata Settings
-	 *
-	 * @access  public
-	 *
-	 * @param array $settings Parse Metadata Settings
-	 */
-	public function parse_settings( array $settings = array() )
+	public function add_meta( $meta, $content = NULL )
 	{
-		foreach ( $settings as $key => $value )
+		if ( is_array( $meta ) )
 		{
-			$this->set_tags( array( $key => $value ) );
-		}
-	}
-
-	/**
-	 * Set Metadata HTTP Equiv
-	 *
-	 * @access public
-	 *
-	 * @param   array $tags     List of HTTP Equiv Variables
-	 * @param   bool  $override Override previous page title
-	 */
-	public function http_equiv( $tags = array(), $override = FALSE )
-	{
-		foreach ( $tags as $tag => $content )
-		{
-			if ( in_array( $tag, $this->_config[ 'valid' ][ 'http_equiv' ] ) )
+			foreach ( $meta as $name => $content )
 			{
-				if ( $override === TRUE OR ! isset ( $this->_vars[ $tag ] ) )
-				{
-					$this->_vars[ $tag ] = $content;
-				}
-				else if ( $override === 'implode' )
-				{
-					$this->_vars[ $tag ] = implode( ', ', array( $this->_vars[ $tag ], $content ) );
-				}
+				$this->add_meta( $name, $content );
+			}
+		}
+		elseif ( is_string( $meta ) )
+		{
+			if ( $meta === 'http-equiv' )
+			{
+				$value = key( $content );
+
+				$this->storage[ 'http_equiv_' . $value ] = new Tag( 'meta', array(
+					'http-equiv' => $value,
+					'content'    => $content[ $value ],
+				) );
+			}
+			else
+			{
+				$this->storage[ $meta ] = new Tag( 'meta', array(
+					'name'    => $meta,
+					'content' => ( is_array( $content ) ? implode( ', ', $content ) : $content ),
+				) );
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------------
-
-	/**
-	 * Set Browser and Page Title
-	 *
-	 * @access public
-	 *
-	 * @param   string $title    Set Page and Browser Title
-	 * @param   bool   $override Override previous page title
-	 */
-	public function set_title( $title, $override = FALSE )
+	public function set_charset( $charset )
 	{
-		if ( $title == '' ) return;
-
-		$this->set_page_title( $title, $override );
-		$this->set_browser_title( $title, $override );
-		$this->set_tags( array( 'title' => $title ), $override );
+		$this->_config[ 'charset' ] = $charset;
 	}
 
 	/**
-	 * Set Page Title
+	 * Whether a offset exists
 	 *
-	 * @access public
+	 * @link  http://php.net/manual/en/arrayaccess.offsetexists.php
 	 *
-	 * @param   string $title    Page Header Title
-	 * @param   bool   $override Override previous page title
+	 * @param mixed $offset An offset to check for.
+	 *
+	 * @return boolean true on success or false on failure.
+	 * @since 5.0.0
 	 */
-	public function set_page_title( $title, $override = FALSE )
+	public function offsetExists( $offset )
 	{
-		if ( $override === TRUE )
-		{
-			$this->_page_title = array();
-		}
-
-		if ( is_array( $title ) )
-		{
-			$this->_page_title = array_merge( $this->_page_title, $title );
-		}
-		else
-		{
-			array_push( $this->_page_title, $title );
-		}
+		return (bool) isset( $this->storage[ $offset ] );
 	}
-
-	// ------------------------------------------------------------------------
 
 	/**
-	 * Set Browser Title
+	 * Offset to retrieve
 	 *
-	 * @access public
+	 * @link  http://php.net/manual/en/arrayaccess.offsetget.php
 	 *
-	 * @param   string $title    Page Browser Title
-	 * @param   bool   $override Override previous page title
+	 * @param mixed $offset <p>
+	 *                      The offset to retrieve.
+	 *                      </p>
+	 *
+	 * @return mixed Can return all value types.
+	 * @since 5.0.0
 	 */
-	public function set_browser_title( $title, $override = FALSE )
+	public function offsetGet( $offset )
 	{
-		if ( $override === TRUE )
-		{
-			$this->_browser_title = array();
-		}
-
-		if ( is_array( $title ) )
-		{
-			$this->_browser_title = array_merge( $this->_browser_title, $title );
-		}
-		else
-		{
-			array_push( $this->_browser_title, $title );
-		}
+		return $this->offsetExists( $offset ) ? $this->storage[ $offset ] : NULL;
 	}
 
-	// ------------------------------------------------------------------------
+	/**
+	 * Offset to set
+	 *
+	 * @link  http://php.net/manual/en/arrayaccess.offsetset.php
+	 *
+	 * @param mixed $offset The offset to assign the value to.
+	 * @param mixed $value  The value to set.
+	 *
+	 * @return void
+	 * @since 5.0.0
+	 */
+	public function offsetSet( $offset, $value )
+	{
+		$this->add_meta( $offset, $value );
+	}
+
+	/**
+	 * Offset to unset
+	 *
+	 * @link  http://php.net/manual/en/arrayaccess.offsetunset.php
+	 *
+	 * @param mixed $offset The offset to unset.
+	 *
+	 * @return void
+	 * @since 5.0.0
+	 */
+	public function offsetUnset( $offset )
+	{
+		unset( $this->storage[ $offset ] );
+	}
+
+	/**
+	 * Count Num of Meta
+	 *
+	 * @link  http://php.net/manual/en/countable.count.php
+	 * @return int The custom count as an integer.
+	 * @since 5.1.0
+	 */
+	public function count()
+	{
+		return count( $this->storage );
+	}
+
+	public function __toString()
+	{
+		return $this->render();
+	}
 
 	/**
 	 * Render Metadata
@@ -319,26 +217,24 @@ class Metadata extends Drivers
 	 */
 	public function render()
 	{
-		$separator = ' ' . $this->_config[ 'separator' ] . ' ';
-
-		$output[ 'page_title' ] = implode( $separator, $this->_page_title );
-		$output[ 'browser_title' ] = implode( $separator, $this->_browser_title );
-
-		$this->_vars[ 'title' ] = $output[ 'browser_title' ];
-
-		$output[ 'tags' ][] = '<meta charset="' . $this->_config[ 'charset' ] . '">';
-
-		if ( count( $this->_vars ) > 0 )
+		if ( ! empty( $this->storage ) )
 		{
-			foreach ( $this->_vars as $tag => $content )
-			{
-				$content = ( is_array( $content ) ? implode( ',', $content ) : $content );
-				$output[ 'tags' ][] = '<meta name="' . $tag . '" content="' . $content . '">';
-			}
+			return implode( PHP_EOL, $this->storage );
 		}
 
-		$output[ 'tags' ] = implode( "\n", $output[ 'tags' ] );
+		return '';
+	}
 
-		return new \ArrayObject( $output, \ArrayObject::ARRAY_AS_PROPS );
+	/**
+	 * Retrieve an external iterator
+	 *
+	 * @link  http://php.net/manual/en/iteratoraggregate.getiterator.php
+	 * @return Traversable An instance of an object implementing <b>Iterator</b> or
+	 *        <b>Traversable</b>
+	 * @since 5.0.0
+	 */
+	public function getIterator()
+	{
+		return new \ArrayIterator( $this->storage );
 	}
 }

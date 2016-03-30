@@ -6,7 +6,7 @@
  *
  * This content is released under the MIT License (MIT)
  *
- * Copyright (c) 2014, PT. Lingkar Kreasi (Circle Creative).
+ * Copyright (c) 2014, .
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
  *
  * @package     O2System
  * @author      Circle Creative Dev Team
- * @copyright   Copyright (c) 2005 - 2014, PT. Lingkar Kreasi (Circle Creative).
+ * @copyright   Copyright (c) 2005 - 2014, .
  * @license     http://circle-creative.com/products/o2system/license.html
  * @license     http://opensource.org/licenses/MIT  MIT License
  * @link        http://circle-creative.com
@@ -49,7 +49,7 @@ namespace O2System\Template\Factory;
  * @subpackage  Libraries
  * @category    Library
  * @author      Steeven Andrian Salim
- * @copyright   Copyright (c) 2015 PT. Lingkar Kreasi (Circle Creative)
+ * @copyright   Copyright (c) 2015
  * @link        http://o2system.center/wiki
  */
 class Wiki
@@ -66,7 +66,7 @@ class Wiki
     public function __construct()
     {
         $controller =& get_instance();
-        $this->_lang = $controller->active['lang'];
+        $this->_lang = $active['lang'];
     }
 
     // ------------------------------------------------------------------------

@@ -35,7 +35,7 @@
  * @since	Version 1.0.0
  * @filesource
  */
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('ROOTPATH') OR exit('No direct script access allowed');
 
 /**
  * Jquery Class
@@ -957,7 +957,7 @@ class CI_Jquery extends CI_Javascript {
 	{
 		// External references
 		$external_scripts = implode('', $this->jquery_code_for_load);
-		$this->CI->load->vars(array('library_src' => $external_scripts));
+		$this->CI->view->add_var(array('library_src' => $external_scripts));
 
 		if (count($this->jquery_code_for_compile) === 0)
 		{
@@ -972,7 +972,7 @@ class CI_Jquery extends CI_Javascript {
 
 		$output = ($script_tags === FALSE) ? $script : $this->inline($script);
 
-		$this->CI->load->vars(array($view_var => $output));
+		$this->CI->view->add_var(array($view_var => $output));
 	}
 
 	// --------------------------------------------------------------------

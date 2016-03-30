@@ -6,7 +6,7 @@
  *
  * This content is released under the MIT License (MIT)
  *
- * Copyright (c) 2015, PT. Lingkar Kreasi (Circle Creative).
+ * Copyright (c) 2015, .
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
  *
  * @package        O2System
  * @author         Circle Creative Dev Team
- * @copyright      Copyright (c) 2005 - 2015, PT. Lingkar Kreasi (Circle Creative).
+ * @copyright      Copyright (c) 2005 - 2015, .
  * @license        http://circle-creative.com/products/o2system-codeigniter/license.html
  * @license        http://opensource.org/licenses/MIT	MIT License
  * @link           http://circle-creative.com/products/o2system-codeigniter.html
@@ -41,8 +41,7 @@ namespace O2System\Template\Drivers;
 
 // ------------------------------------------------------------------------
 
-use O2System\Glob\Factory\Registry;
-use O2System\Glob\Interfaces\Drivers;
+use O2System\Glob\Interfaces\DriverInterface;
 use O2System\Template\Exception;
 
 /**
@@ -53,58 +52,34 @@ use O2System\Template\Exception;
  * @category         Driver
  * @version          1.0 Build 11.09.2012
  * @author           Steeven Andrian Salim
- * @copyright        Copyright (c) 2005 - 2014 PT. Lingkar Kreasi (Circle Creative)
+ * @copyright        Copyright (c) 2005 - 2014
  * @license          http://www.circle-creative.com/products/o2system/license.html
  * @link             http://www.circle-creative.com
  */
-class Theme extends Drivers
+class Theme extends DriverInterface
 {
-	/**
-	 * Theme Default
-	 *
-	 * @access public
-	 * @type   object
-	 */
-	public $default;
+	public $active   = FALSE;
+	public $layout;
+	public $partials = array(
+		'theme'  => array(),
+		'custom' => array(),
+	);
 
-	/**
-	 * Theme Active
-	 *
-	 * @access public
-	 * @type   object
-	 */
-	public $active;
-
-	/**
-	 * Theme Package Path
-	 *
-	 * @access public
-	 * @type   string
-	 */
-	public $packages_path;
-
-	public function set_default( $theme )
+	public function set( $theme )
 	{
-		if ( $this->exists( $theme ) )
+		if ( is_string( $theme ) )
 		{
-			$this->default = $this->load( $theme );
-
-			return TRUE;
+			if ( $this->exists( $theme ) )
+			{
+				$this->_load_package( $theme );
+			}
+		}
+		elseif ( is_bool( $theme ) AND $theme === FALSE )
+		{
+			$this->active = FALSE;
 		}
 
-		return FALSE;
-	}
-
-	public function set_active( $theme )
-	{
-		if ( $this->exists( $theme ) )
-		{
-			$this->active = $this->load( $theme );
-
-			return TRUE;
-		}
-
-		return FALSE;
+		return $this;
 	}
 
 	/**
@@ -112,63 +87,84 @@ class Theme extends Drivers
 	 *
 	 * @param $theme
 	 *
-	 * @access  public
+	 * @access  protected
 	 * @return  bool
 	 */
-	public function load( $theme )
+	protected function _load_package( $theme )
 	{
-		$theme_path = $this->packages_path . 'themes' . DIRECTORY_SEPARATOR . $theme . DIRECTORY_SEPARATOR;
-
-		if ( file_exists( $theme_path . 'theme.properties' ) )
+		foreach ( $this->_library->_paths as $path )
 		{
-			$properties = json_decode( file_get_contents( $theme_path . 'theme.properties' ), TRUE );
-
-			if ( json_last_error() === JSON_ERROR_NONE )
+			if ( is_dir( $theme_path = $path . 'themes' . DIRECTORY_SEPARATOR . $theme . DIRECTORY_SEPARATOR ) )
 			{
-				$properties = new Registry( $properties );
-				$properties[ 'parameter' ] = $theme;
-				$properties[ 'realpath' ] = $theme_path;
-
-				if ( file_exists( $theme_path . 'theme.settings' ) )
+				// Locate theme properties
+				if ( ! is_file( $theme_path . 'theme.properties' ) )
 				{
-					$settings = json_decode( file_get_contents( $theme_path . 'theme.settings' ), TRUE );
+					throw new ThemeInvalidPropertiesException( 'TEMPLATE_THEMEUNABLETOLOCATEPROPERTIES', 12002, [ $theme_path . 'theme.properties' ] );
+				}
 
-					if ( json_last_error() === JSON_ERROR_NONE )
+				// Read theme properties
+				$properties = json_decode( file_get_contents( $theme_path . 'theme.properties' ), TRUE );
+
+				if ( json_last_error() !== JSON_ERROR_NONE )
+				{
+					throw new ThemeInvalidPropertiesException( 'TEMPLATE_THEMEUNABLETOPARSEPROPERTIES', 12003, [ $theme_path . 'theme.properties' ] );
+				}
+				else
+				{
+					$this->active = new \ArrayObject( $properties, \ArrayObject::ARRAY_AS_PROPS );
+					$this->active[ 'parameter' ] = $theme;
+					$this->active[ 'realpath' ] = $theme_path;
+					$this->active[ 'url' ] = path_to_url( $theme_path ) . '/';
+
+					$this->_library->add_path( $theme_path );
+
+					if ( is_file( $theme_path . 'theme.settings' ) )
 					{
-						$properties[ 'settings' ] = new Registry( $settings );
+						$settings = json_decode( file_get_contents( $theme_path . 'theme.settings' ), TRUE );
+
+						if ( json_last_error() === JSON_ERROR_NONE )
+						{
+							$this->active[ 'settings' ] = $settings;
+						}
+						else
+						{
+							throw new ThemeInvalidSettingsException( 'TEMPLATE_THEMEUNABLETOPARSESETTINGS', 12004, [ $theme_path . 'theme.settings' ] );
+						}
+					}
+
+					$extension = isset( $this->active[ 'settings' ][ 'extension' ] ) ? $this->active[ 'settings' ][ 'extension' ] : 'tpl';
+
+					if ( is_file( $layout = $theme_path . 'theme.' . $extension ) )
+					{
+						$this->active[ 'layout' ] = $layout;
+
+						// Read Partials
+						if ( is_dir( $theme_path . 'partials' . DIRECTORY_SEPARATOR ) )
+						{
+							$files = scandir( $theme_path . 'partials' . DIRECTORY_SEPARATOR );
+							$this->active[ 'partials' ] = array();
+
+							foreach ( $files as $file )
+							{
+								if ( is_file( $theme_path . 'partials' . DIRECTORY_SEPARATOR . $file ) )
+								{
+									$this->active[ 'partials' ][ pathinfo( $file, PATHINFO_FILENAME ) ] = $theme_path . 'partials' . DIRECTORY_SEPARATOR . $file;
+								}
+							}
+						}
 					}
 					else
 					{
-						$this->library->throw_error( 'Unable to read theme settings: ' . $theme_path . 'theme.settings' );
+						$this->setError( 'Unable to read theme layout: ' . $theme_path . 'theme.tpl' );
 					}
 				}
 
-				if ( file_exists( $layout = $theme_path . 'theme.tpl' ) )
-				{
-					$properties[ 'layout' ] = $layout;
-				}
-
-				// Read Partials
-				if ( is_dir( $theme_path . 'partials' . DIRECTORY_SEPARATOR ) )
-				{
-					$partials = scandir( $theme_path . 'partials' . DIRECTORY_SEPARATOR );
-
-					foreach ( $partials as $partial )
-					{
-						if ( is_file( $theme_path . 'partials' . DIRECTORY_SEPARATOR . $partial ) )
-						{
-							$properties[ 'partials' ][ pathinfo( $partial, PATHINFO_FILENAME ) ] = $theme_path . 'partials' . DIRECTORY_SEPARATOR . $partial;
-						}
-					}
-				}
-
-				return $properties;
+				return TRUE;
+				break;
 			}
-
-			return $this->library->throw_error( 'Unable to read theme properties: ' . $theme_path . 'theme.properties' );
 		}
 
-		return $this->library->throw_error( 'Unable to load theme: ' . $theme_path );
+		throw new ThemeException( 'TEMPLATE_THEMEUNABLETOLOCATEPACKAGE', 12001, [ $theme_path ] );
 	}
 
 	/**
@@ -181,11 +177,26 @@ class Theme extends Drivers
 	 */
 	public function exists( $theme )
 	{
-		$theme_path = $this->packages_path . 'themes' . DIRECTORY_SEPARATOR . $theme . DIRECTORY_SEPARATOR;
-
-		if ( is_dir( $theme_path ) AND file_exists( $theme_path . 'theme.properties' ) )
+		foreach ( $this->_library->_paths as $path )
 		{
-			return TRUE;
+			if ( is_dir( $path . 'themes' . DIRECTORY_SEPARATOR . $theme ) )
+			{
+				return TRUE;
+				break;
+			}
+		}
+
+		return FALSE;
+	}
+
+	public function layout_exists( $layout )
+	{
+		if ( isset( $this->active->realpath ) )
+		{
+			if ( is_dir( $this->active->realpath . 'layouts' . DIRECTORY_SEPARATOR . $layout . DIRECTORY_SEPARATOR ) )
+			{
+				return TRUE;
+			}
 		}
 
 		return FALSE;
@@ -200,88 +211,84 @@ class Theme extends Drivers
 	 * @access  public
 	 * @return  bool
 	 */
-	public function set_layout( $filename = 'theme', $extension = '.tpl' )
+	public function set_layout( $layout = NULL )
 	{
-		if ( is_dir( $this->active->realpath . 'layouts' . DIRECTORY_SEPARATOR ) )
+		if ( isset( $layout ) )
 		{
-			$filepath = $this->active->realpath . 'layouts' . DIRECTORY_SEPARATOR . $filename . $extension;
-		}
-		else
-		{
-			$filepath = $this->active->realpath . $filename . $extension;
-		}
-
-		if ( file_exists( $filepath ) )
-		{
-			$this->active->layout = $filepath;
-
-			$path = pathinfo( $filepath, PATHINFO_DIRNAME ) . DIRECTORY_SEPARATOR;
-			$layout = pathinfo( $filepath, PATHINFO_FILENAME );
-
-			if ( file_exists( $settings = $path . $layout . '.settings' ) )
+			if ( $this->layout_exists( $layout ) )
 			{
-				$this->active->settings = json_decode( file_get_contents( $settings ), TRUE );
-			}
+				$layout_path = $this->active->realpath . 'layouts' . DIRECTORY_SEPARATOR . $layout . DIRECTORY_SEPARATOR;
 
-			// Read Partials
-			if ( is_dir( $this->active->realpath . 'partials' . DIRECTORY_SEPARATOR . $layout . DIRECTORY_SEPARATOR ) )
-			{
-				$partials = scandir( $this->active->realpath . 'partials' . DIRECTORY_SEPARATOR . $layout . DIRECTORY_SEPARATOR );
-				$this->active->partials = array();
+				$extension = isset( $this->active[ 'settings' ][ 'extension' ] ) ? $this->active[ 'settings' ][ 'extension' ] : 'tpl';
 
-				foreach ( $partials as $partial )
+				if ( is_file( $layout_path . $layout . '.' . $extension ) )
 				{
-					if ( is_file( $this->active->realpath . 'partials' . DIRECTORY_SEPARATOR . $layout . DIRECTORY_SEPARATOR . $partial ) )
+					$this->active[ 'layout' ] = $layout_path . $layout . '.' . $extension;
+
+					$this->_library->add_path( $layout_path );
+
+					// Load Layout Settings
+					if ( is_file( $layout_path . $layout . '.settings' ) )
 					{
-						$this->active->partials[ pathinfo( $partial, PATHINFO_FILENAME ) ] = $this->active->realpath . 'partials' . DIRECTORY_SEPARATOR . $layout . DIRECTORY_SEPARATOR . $partial;
+						$settings = json_decode( file_get_contents( $layout_path . $layout . '.settings' ), TRUE );
+
+						if ( json_last_error() === JSON_ERROR_NONE )
+						{
+							$this->active[ 'settings' ] = $settings;
+						}
+					}
+					else
+					{
+						throw new ThemeInvalidSettingsException( 'TEMPLATE_THEMEUNABLETOPARSESETTINGS', 12004, [ $layout_path . $layout . '.settings' ] );
 					}
 				}
-			}
 
-			return TRUE;
+				// Load Layout Partials
+				if ( is_dir( $layout_path . 'partials' . DIRECTORY_SEPARATOR ) )
+				{
+					$files = scandir( $layout_path . 'partials' . DIRECTORY_SEPARATOR );
+					$this->active[ 'partials' ] = array();
+
+					foreach ( $files as $file )
+					{
+						if ( is_file( $layout_path . 'partials' . DIRECTORY_SEPARATOR . $file ) )
+						{
+							$this->active[ 'partials' ][ pathinfo( $file, PATHINFO_FILENAME ) ] = $layout_path . 'partials' . DIRECTORY_SEPARATOR . $file;
+						}
+					}
+				}
+
+				return TRUE;
+			}
 		}
 
-		return $this->library->throw_error( 'Unable to load requested layout: ' . $filename );
+		return $this->_library->setError( 'Unable to load requested layout: ' . $layout );
 	}
+}
 
-	public function url( $uri = NULL )
+class ThemeException extends Exception
+{
+	public function __construct( $message, $code, $args = array() )
 	{
-		if ( isset( $this->active ) )
-		{
-			$base_url = isset( $_SERVER[ 'REQUEST_SCHEME' ] ) ? $_SERVER[ 'REQUEST_SCHEME' ] : 'http';
-			$base_url .= '://' . $_SERVER[ 'SERVER_NAME' ];
+		$this->_args = $args;
+		parent::__construct( $message, $code );
+	}
+}
 
-			// Add server port if needed
-			$base_url .= $_SERVER[ 'SERVER_PORT' ] !== '80' ? ':' . $_SERVER[ 'SERVER_PORT' ] : '';
+class ThemeInvalidPropertiesException extends Exception
+{
+	public function __construct( $message, $code, $args = array() )
+	{
+		$this->_args = $args;
+		parent::__construct( $message, $code );
+	}
+}
 
-			// Add base path
-			$base_url .= dirname( $_SERVER[ 'SCRIPT_NAME' ] );
-			$base_url = str_replace( DIRECTORY_SEPARATOR, '/', $base_url );
-			$base_url = trim( $base_url, '/' ) . '/';
-
-			// Vendor directory
-			$base_dir = explode( 'vendor' . DIRECTORY_SEPARATOR . 'o2system', __DIR__ );
-			$base_dir = str_replace( [ 'o2system', '/' ], [ '', DIRECTORY_SEPARATOR ], $base_dir[ 0 ] );
-			$base_dir = trim( $base_dir, DIRECTORY_SEPARATOR );
-
-			// Theme directory
-			$theme_dir = str_replace( '/', DIRECTORY_SEPARATOR, $this->active->realpath );
-			$theme_path = str_replace( $base_dir, '', $theme_dir );
-			$theme_path = str_replace( DIRECTORY_SEPARATOR, '/', $theme_path );
-			$theme_path = trim($theme_path, '/') . '/';
-
-			$theme_url = $base_url . $theme_path;
-
-			if ( isset( $uri ) )
-			{
-				$uri = is_array( $uri ) ? implode( '/', $uri ) : $uri;
-
-				return $theme_url . $uri;
-			}
-
-			return $theme_url;
-		}
-
-		return FALSE;
+class ThemeInvalidSettingsException extends Exception
+{
+	public function __construct( $message, $code, $args = array() )
+	{
+		$this->_args = $args;
+		parent::__construct( $message, $code );
 	}
 }

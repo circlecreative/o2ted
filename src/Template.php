@@ -39,9 +39,6 @@
 
 namespace O2System
 {
-
-	use O2System\Glob\Interfaces\Libraries;
-
 	/**
 	 * Class Template
 	 *
@@ -49,17 +46,16 @@ namespace O2System
 	 * @author      O2System Developer Team
 	 * @link        http://o2system.in/features/o2template
 	 */
-	class Template extends Libraries
+	class Template extends Glob\Interfaces\LibraryInterface
 	{
-		/**
-		 * Template Parser Resource
-		 *
-		 * @access  public
-		 * @type    Parser
-		 */
-		public $parser;
+		protected $_charset = 'UTF-8';
+		protected $_paths   = array();
 
-		// ------------------------------------------------------------------------
+		protected $_title_separator = '-';
+		protected $_title_browser   = array();
+		protected $_title_page      = array();
+
+		protected $_cached_vars = array();
 
 		/**
 		 * Class Constructor
@@ -68,21 +64,258 @@ namespace O2System
 		 *
 		 * @access  public
 		 */
-		public function __construct( $config = array() )
+		public function initialize()
 		{
-			parent::__construct( $config );
-
-			if ( isset( $this->_config[ 'parser' ] ) )
+			// Load Template Language
+			if ( class_exists( 'O2System', FALSE ) )
 			{
-				$this->parser = new Parser( $this->_config[ 'parser' ] );
+				\O2System::$language->load( 'template' );
 			}
 			else
 			{
-				$this->parser = new Parser();
+				\O2System\Glob::$language->load( 'template' );
+			}
+
+			// Set Template Parser
+			if ( isset( $this->_config[ 'parser' ] ) )
+			{
+				$this->__set( 'parser', new Parser( $this->_config[ 'parser' ] ) );
+			}
+			else
+			{
+				$this->__set( 'parser', new Parser() );
+			}
+
+			// Set Template Assets
+			if ( isset( $this->_config[ 'assets' ][ 'autoload' ] ) )
+			{
+				$assets = $this->_config[ 'assets' ][ 'autoload' ];
+				unset( $this->_config[ 'assets' ][ 'autoload' ] );
+
+				$this->assets->add_assets( $assets, 'core' );
+			}
+
+			// Set Template Theme
+			if ( isset( $this->_config[ 'theme' ][ 'default' ] ) )
+			{
+				$this->theme->set( $this->_config[ 'theme' ][ 'default' ] );
+			}
+			else
+			{
+				$this->theme->set( FALSE );
 			}
 		}
 
 		// ------------------------------------------------------------------------
+
+		/**
+		 * Set Charset
+		 *
+		 * @param $charset
+		 *
+		 * @return $this
+		 */
+		public function set_charset( $charset )
+		{
+			$_valid_charsets = array(
+				'UTF-8', // HTML5
+				'UTF-16', // HTML5
+				'ISO-8859-8' // HTML4
+			);
+
+			$charset = strtoupper( $charset );
+
+			if ( in_array( $charset, $_valid_charsets ) )
+			{
+				$this->_charset = $charset;
+			}
+
+			return $this;
+		}
+
+		/**
+		 * Set Title Separator
+		 *
+		 * @param $separator
+		 */
+		public function set_title_separator( $separator )
+		{
+			$this->_title_separator = $separator;
+		}
+
+		/**
+		 * Set Title
+		 *
+		 * Set Browser Title and Page Title at once
+		 *
+		 * @param $title
+		 */
+		public function set_title( $title )
+		{
+			$this->set_title_browser( $title );
+			$this->set_title_page( $title );
+		}
+
+		/**
+		 * Add Title
+		 *
+		 * Add Browser Title and Page Title at once
+		 *
+		 * @param $title
+		 */
+		public function add_title( $title )
+		{
+			$this->add_title_browser( $title );
+			$this->add_title_page( $title );
+		}
+
+		/**
+		 * Set Title Browser
+		 *
+		 * @param $browser_title
+		 */
+		public function set_title_browser( $browser_title )
+		{
+			$this->_title_browser = array( $browser_title );
+		}
+
+		/**
+		 * Add Title Browser
+		 *
+		 * @param $browser_title
+		 */
+		public function add_title_browser( $browser_title )
+		{
+			if ( ! in_array( $browser_title, $this->_title_browser ) )
+			{
+				$this->_title_browser[] = $browser_title;
+			}
+		}
+
+		/**
+		 * Set Title Page
+		 *
+		 * @param $page_title
+		 */
+		public function set_title_page( $page_title )
+		{
+			$this->_title_page = array( $page_title );
+		}
+
+		/**
+		 * Add Title Page
+		 *
+		 * @param $page_title
+		 */
+		public function add_title_page( $page_title )
+		{
+			if ( ! in_array( $page_title, $this->_title_page ) )
+			{
+				$this->_title_page[] = $page_title;
+			}
+		}
+
+		/**
+		 * Set Vars
+		 *
+		 * Set Template Cached Vars
+		 *
+		 * @param array $vars
+		 *
+		 * @return $this
+		 */
+		public function set_vars( array $vars )
+		{
+			$this->_cached_vars = $vars;
+
+			return $this;
+		}
+
+		/**
+		 * Add Vars
+		 *
+		 * Add multiple template cached vars
+		 *
+		 * @param array $vars
+		 *
+		 * @return $this
+		 */
+		public function add_vars( array $vars )
+		{
+			$this->_cached_vars = array_merge( $this->_cached_vars, $vars );
+
+			return $this;
+		}
+
+		/**
+		 * Add Var
+		 *
+		 * Add single template cached vars
+		 *
+		 * @param $index
+		 * @param $value
+		 */
+		public function add_var( $index, $value )
+		{
+			$this->_cached_vars[ $index ] = $value;
+		}
+
+		/**
+		 * Set Paths
+		 *
+		 * Set searchable views and assets paths
+		 *
+		 * @param array $paths
+		 *
+		 * @return $this
+		 */
+		public function set_paths( array $paths )
+		{
+			// Add O2Template Path
+			array_unshift( $paths, __DIR__ . DIRECTORY_SEPARATOR );
+
+			$this->_paths = array_reverse( array_unique( $paths ) );
+
+			return $this;
+		}
+
+		/**
+		 * Add Paths
+		 *
+		 * Add searchable views and assets paths
+		 *
+		 * @param array $paths
+		 *
+		 * @return $this
+		 */
+		public function add_paths( array $paths )
+		{
+			foreach ( $paths as $path )
+			{
+				$this->add_path( $path );
+			}
+
+			return $this;
+		}
+
+		/**
+		 * Add Path
+		 *
+		 * Add searchable views and asset path
+		 *
+		 * @param $path
+		 *
+		 * @return $this
+		 */
+		public function add_path( $path )
+		{
+			if ( ! in_array( $path, $this->_paths ) )
+			{
+				array_unshift( $this->_paths, $path );
+			}
+
+			return $this;
+		}
 
 		/**
 		 * Render
@@ -91,148 +324,90 @@ namespace O2System
 		 *
 		 * @param            $view
 		 * @param array      $vars
-		 * @param bool|FALSE $return
-		 *
-		 * @return string
 		 */
-		public function render( $view, array $vars = array(), $assets = array() )
+		public function render( $view = NULL, array $vars = array() )
 		{
-			if ( ! isset( $this->theme->active ) )
+			$this->_cached_vars = array_merge( $this->_cached_vars, $vars );
+
+			// Set Charset Metadata
+			$this->metadata->add_meta( 'charset', $this->_charset );
+
+			// Set Browser Title
+			$this->_cached_vars[ 'browser_title' ] = implode( ' ' . $this->_title_separator . ' ', $this->_title_browser );
+			$this->_cached_vars[ 'page_title' ] = implode( ' ' . $this->_title_separator . ' ', $this->_title_page );
+			$this->_cached_vars[ 'navigations' ] = $this->navigations;
+			$this->_cached_vars[ 'forms' ] = $this->forms;
+
+			if ( class_exists( 'O2System', FALSE ) )
 			{
-				$active = $this->theme->default;
+				$this->_cached_vars[ 'active' ] =& \O2System::$active;
+				$this->_cached_vars[ 'language' ] =& \O2System::$language;
+
+				foreach ( \O2System::instance()->getStorage() as $key => $value )
+				{
+					if ( ! in_array( $key, array( 'exceptions', 'cache', 'log', 'db' ) ) )
+					{
+						$this->_cached_vars[ $key ] = $value;
+					}
+				}
+			}
+
+			// Set Metadata Title
+			if ( $this->metadata->offsetExists( 'title' ) === FALSE )
+			{
+				$this->metadata->add_meta( 'title', $this->_cached_vars[ 'browser_title' ] );
+			}
+
+			$this->_cached_vars[ 'metadata' ] = $this->metadata;
+
+			if ( $this->theme->active === FALSE )
+			{
+				$this->_cached_vars[ 'partials' ] = $this->partials;
+				$this->_cached_vars[ 'assets' ] = $this->assets;
+				$this->_cached_vars[ 'widgets' ] = $this->widgets;
+
+				// Load Layout
+				$output = $this->view->load( $view, $this->_cached_vars, TRUE );
 			}
 			else
 			{
-				$active = $this->theme->active;
-			}
+				$this->_cached_vars[ 'theme' ] = $this->theme->active;
+				$this->_cached_vars[ 'widgets' ] = $this->widgets;
 
-			if ( empty( $active ) )
-			{
-				throw new \RuntimeException( 'Template theme not set' );
-			}
-
-			// Load Template Theme
-			$template_vars[ 'theme' ] = $active;
-
-			// Load Template Metadata
-			if ( isset( $active->settings[ 'metadata' ] ) )
-			{
-				$this->metadata->parse_settings( $active->settings[ 'metadata' ] );
-			}
-
-			$template_vars[ 'metadata' ] = $this->metadata->render();
-
-			// Load Template Assets
-			$this->assets->add_paths( $active->realpath );
-
-			if ( isset( $active->settings[ 'assets' ] ) )
-			{
-				$this->assets->parse_settings( $active->settings[ 'assets' ] );
-			}
-
-			// Load view assets
-			if ( ! empty( $assets ) )
-			{
-				foreach ( $assets as $extension => $files )
+				if ( isset( $this->theme->active[ 'partials' ] ) )
 				{
-					foreach ( $files as $asset )
-					{
-						$this->assets->{'link_' . $extension}( $this->assets->path_to_url( $asset ) );
-					}
-				}
-			}
-
-			// Merge Vars Data
-			$template_vars = array_merge_recursive( $template_vars, $vars );
-
-			if ( ! isset( $template_vars[ 'partials' ] ) )
-			{
-				$template_vars[ 'partials' ] = new \stdClass();
-			}
-			elseif ( ! is_object( $template_vars[ 'partials' ] ) )
-			{
-				$template_vars[ 'partials' ] = (object) $template_vars[ 'partials' ];
-			}
-
-			$partials = empty( $active->partials ) ? array() : $active->partials;
-
-			if ( strpos( $view, 'views' ) )
-			{
-				if ( file_exists( $view ) )
-				{
-					$partials[ 'content' ] = $view;
+					$this->partials->add_partials( $this->theme->active[ 'partials' ] );
 				}
 
-				$x_view = explode( 'views' . DIRECTORY_SEPARATOR, $view );
-
-				if ( file_exists( $active->realpath . 'views' . DIRECTORY_SEPARATOR . end( $x_view ) ) )
+				if ( $this->partials->offsetExists( 'content' ) === FALSE )
 				{
-					$partials[ 'content' ] = $active->realpath . 'views' . DIRECTORY_SEPARATOR . end( $x_view );
+					$this->partials->add_partial( 'content', $view );
 				}
-			}
-			elseif ( file_exists( $view ) )
-			{
-				$partials[ 'content' ] = $view;
-			}
 
-			if ( ! isset( $partials[ 'content' ] ) )
-			{
-				throw new \RuntimeException( 'Unable to load the requested view file: ' . $view );
-			}
+				$this->_cached_vars[ 'partials' ] = $this->partials;
 
-			foreach ( $partials as $partial => $filepath )
-			{
-				if ( file_exists( $filepath ) )
+				if ( isset( $this->theme->active[ 'settings' ][ 'metadata' ] ) )
 				{
-					$partial_content = $this->parser->parse_source_code( file_get_contents( $filepath ), $template_vars );
-
-					$DOM = new \DOMDocument();
-					@$DOM->loadHTML( $partial_content );
-					$DOM->preserveWhiteSpace = FALSE;
-
-					$inline_js = $DOM->getElementsByTagName( 'script' );
-					$inline_style = $DOM->getElementsByTagName( 'style' );
-
-					// Fetch Inline JS
-					if ( ! empty( $inline_js ) )
-					{
-						foreach ( $inline_js as $item )
-						{
-							$this->assets->inline_js( $item->nodeValue );
-						}
-
-						$partial_content = preg_replace( '#<script(.*?)>(.*?)</script>#is', '', $partial_content );
-					}
-
-					// Fetch Inline Style
-					if ( ! empty( $inline_style ) )
-					{
-						foreach ( $inline_style as $item )
-						{
-							$this->assets->inline_css( $item->nodeValue );
-						}
-
-						$partial_content = preg_replace( '#<style(.*?)>(.*?)</style>#is', '', $partial_content );
-					}
-
-					$template_vars[ 'partials' ]->{$partial} = $partial_content;
+					$this->metadata->add_meta( $this->theme->active[ 'settings' ][ 'metadata' ] );
 				}
+
+				if ( isset( $this->theme->active[ 'settings' ][ 'assets' ] ) )
+				{
+					$this->assets->add_assets( $this->theme->active[ 'settings' ][ 'assets' ], 'theme' );
+				}
+
+				$this->assets->add_asset( pathinfo( $this->theme->active[ 'layout' ], PATHINFO_FILENAME ), 'custom' );
+
+				$this->_cached_vars[ 'metadata' ] = $this->metadata;
+				$this->_cached_vars[ 'assets' ] = $this->assets;
+
+				// Load Layout
+				$output = $this->parser->parse_source_code( file_get_contents( $this->theme->active[ 'layout' ] ), $this->_cached_vars );
 			}
 
-			$template_vars[ 'assets' ] = $this->assets->render();
-
-			if ( file_exists( $active->layout ) )
-			{
-				$output = $this->parser->parse_source_code( file_get_contents( $active->layout ), $template_vars );
-
-				$this->output->set_content_type( 'text/html' );
-				$this->output->set_content( $output );
-			}
-			else
-			{
-				$layout = empty( $active->layout ) ? 'theme.tpl' : $active->layout;
-				throw new \RuntimeException( 'Unable to load the requested template file: ' . $layout );
-			}
+			// Send Final Output to Browser
+			$this->output->set_content_type( 'text/html' );
+			$this->output->set_content( $output );
 		}
 	}
 }
@@ -242,25 +417,49 @@ namespace O2System
 namespace O2System\Template
 {
 
-	use O2System\Glob\Exception\Interfaces as ExceptionInterface;
+	use O2System\Glob\Interfaces\ExceptionInterface;
 
 	/**
 	 * Class Exception
 	 *
-	 * @package     O2Template
-	 *
-	 * @author      O2System Developer Team
-	 * @link        http://o2system.in/features/o2template
+	 * @package O2System\Template
 	 */
 	class Exception extends ExceptionInterface
 	{
-		public function __construct( $message = NULL, $code = 0, $previous = NULL )
-		{
-			parent::__construct( $message, $code, $previous );
+		public $library = array(
+			'name'        => 'O2System Template (O2Template)',
+			'description' => 'Open Source Template Management Library',
+			'version'     => '1.0',
+		);
 
-			// Register Custom Exception View Path
-			$this->register_view_paths( __DIR__ . '/Views/' );
+		public $view_exception = 'template_exception.php';
+	}
+
+	// ------------------------------------------------------------------------
+
+	/**
+	 * Class RunTimeException
+	 *
+	 * @package O2System\Template
+	 */
+	class RunTimeException extends Exception
+	{
+
+	}
+
+	// ------------------------------------------------------------------------
+
+	/**
+	 * Class ViewException
+	 *
+	 * @package O2System\Template
+	 */
+	class ViewException extends Exception
+	{
+		public function __construct( $message, $code, $args = array() )
+		{
+			$this->_args = $args;
+			parent::__construct( $message, $code );
 		}
 	}
 }
-
