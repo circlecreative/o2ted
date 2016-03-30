@@ -54,63 +54,42 @@ namespace O2System\Template\Factory;
  */
 class Wiki
 {
-    protected $_lang;
-    protected $_folder;
-    protected $_pages;
+    protected $_lang = NULL;
+    protected $_pages = array();
     protected $_files;
-    protected $_base_url;
 
-    /**
-     * class constructor
-     */
     public function __construct()
     {
-        $controller =& get_instance();
-        $this->_lang = $active['lang'];
+        if( class_exists('O2System') )
+        {
+            if( \O2System::$active->offsetExists('language') )
+            {
+                $this->_lang = \O2System::$active['language']->parameter;
+            }
+        }
     }
 
-    // ------------------------------------------------------------------------
-    /**
-     * @param $folder
-     *
-     * @return $this
-     */
-    public function set_folder( $folder )
+    public function set_lang( $lang )
     {
-        $this->_folder = $folder;
+        $this->_lang = $lang;
 
         return $this;
     }
 
-    // ------------------------------------------------------------------------
-    /**
-     * @param $url
-     *
-     * @return $this
-     */
-    public function set_base_url( $url )
-    {
-        $this->_base_url = $url;
-
-        return $this;
-    }
-
-    // ------------------------------------------------------------------------
     /**
      * load
      */
-    public function load()
+    public function load( $path )
     {
-        if( is_dir( $this->_folder . $this->_lang ) )
+        if( is_dir( $path . $this->_lang ) )
         {
-            $this->_folder = $this->_folder . $this->_lang;
+            $path = $path . $this->_lang;
         }
 
-        $directory = new \RecursiveDirectoryIterator( $this->_folder );
+        $directory = new \RecursiveDirectoryIterator( $path );
         $iterator = new \RecursiveIteratorIterator( $directory );
         $results = new \RegexIterator( $iterator, '/^.+\.md/i', \RecursiveRegexIterator::GET_MATCH );
 
-        $this->_pages = array();
         foreach( $results as $file )
         {
             foreach( $results as $files )
@@ -120,7 +99,7 @@ class Wiki
                     $wiki = new \stdClass();
                     $wiki->realpath = realpath( $file );
 
-                    $wiki->filepath = str_replace( realpath( $this->_folder ), '', $wiki->realpath );
+                    $wiki->filepath = str_replace( realpath( $path ), '', $wiki->realpath );
                     $wiki->filepath = str_replace( DS, '/', substr( $wiki->filepath, 1 ) );
 
                     $filename = pathinfo( $wiki->realpath, PATHINFO_FILENAME );
